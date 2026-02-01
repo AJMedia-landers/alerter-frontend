@@ -8,7 +8,7 @@ import type {
 } from '../types/alerter.types'
 import { AuthService } from './auth.service'
 
-const API_BASE_URL = 'http://localhost:5000'
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 
 export class AlerterService {
   /**
