@@ -1,191 +1,207 @@
-import { useState, useEffect, useCallback } from 'react'
-import { AlerterService } from '../services/alerter.service'
-import type { AlerterRule, RuleScope, ConditionType } from '../types/alerter.types'
-import '../styles/AlertsConfig.css'
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import type { AlerterRule, RuleScope, ConditionType } from "@/types/alerter";
 
 const SCOPE_OPTIONS: { value: RuleScope; label: string; description: string; icon: string }[] = [
   {
-    value: 'account',
-    label: 'Account Level',
-    description: 'Alert when aggregated metrics across all campaigns exceed threshold',
-    icon: '🏢',
+    value: "account",
+    label: "Account Level",
+    description: "Alert when aggregated metrics across all campaigns exceed threshold",
+    icon: "",
   },
   {
-    value: 'campaign',
-    label: 'Campaign Level',
-    description: 'Alert for individual campaigns that exceed threshold',
-    icon: '📊',
+    value: "campaign",
+    label: "Campaign Level",
+    description: "Alert for individual campaigns that exceed threshold",
+    icon: "",
   },
-]
+];
 
 const CONDITION_OPTIONS: {
-  value: ConditionType
-  label: string
-  description: string
-  icon: string
+  value: ConditionType;
+  label: string;
+  description: string;
+  icon: string;
 }[] = [
   {
-    value: 'cpa_threshold',
-    label: 'CPA Threshold',
-    description: 'Alert when Cost Per Action (CPA) reaches or exceeds threshold',
-    icon: '💰',
+    value: "cpa_threshold",
+    label: "CPA Threshold",
+    description: "Alert when Cost Per Action (CPA) reaches or exceeds threshold",
+    icon: "",
   },
   {
-    value: 'zero_conv_spend',
-    label: 'Zero Conversions',
-    description: 'Alert when spend reaches threshold with zero conversions',
-    icon: '❌',
+    value: "zero_conv_spend",
+    label: "Zero Conversions",
+    description: "Alert when spend reaches threshold with zero conversions",
+    icon: "",
   },
   {
-    value: 'weekly_cpa_increase',
-    label: 'Weekly CPA Increase',
-    description: 'Alert when CPA increases by percentage vs same period last week',
-    icon: '📈',
+    value: "weekly_cpa_increase",
+    label: "Weekly CPA Increase",
+    description: "Alert when CPA increases by percentage vs same period last week",
+    icon: "",
   },
-]
+];
 
-export function AlertsConfig() {
-  const [rules, setRules] = useState<AlerterRule[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [successMessage, setSuccessMessage] = useState<string | null>(null)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [editingRule, setEditingRule] = useState<AlerterRule | null>(null)
-  const [showInactive, setShowInactive] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [filterScope, setFilterScope] = useState<RuleScope | 'all'>('all')
-  const [filterCondition, setFilterCondition] = useState<ConditionType | 'all'>('all')
+export default function AlertsPage() {
+  const [rules, setRules] = useState<AlerterRule[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [editingRule, setEditingRule] = useState<AlerterRule | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterScope, setFilterScope] = useState<RuleScope | "all">("all");
+  const [filterCondition, setFilterCondition] = useState<ConditionType | "all">("all");
 
-  // Form states
-  const [formData, setFormData] = useState<Omit<AlerterRule, 'id' | 'created_at' | 'updated_at'>>({
-    name: '',
-    scope: 'account',
-    account_name: '',
+  const [formData, setFormData] = useState<Omit<AlerterRule, "id" | "created_at" | "updated_at">>({
+    name: "",
+    scope: "account",
+    account_name: "",
     timeframe_hours: 2,
-    condition_type: 'cpa_threshold',
+    condition_type: "cpa_threshold",
     threshold: 0,
     is_active: true,
-  })
+  });
 
   const loadRules = useCallback(async () => {
     try {
-      setLoading(true)
-      setError(null)
-      const response = await AlerterService.getAllRules(!showInactive)
+      setLoading(true);
+      setError(null);
+      const url = showInactive ? "/api/alerter-rules" : "/api/alerter-rules?active=true";
+      const response = await fetch(url);
+      const data = await response.json();
 
-      if (response.data) {
-        setRules(response.data)
+      if (data.data) {
+        setRules(data.data);
       } else {
-        setError('Failed to load rules')
+        setError("Failed to load rules");
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to load rules'
-      setError(message)
+    } catch {
+      setError("Failed to load rules");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [showInactive])
+  }, [showInactive]);
 
   useEffect(() => {
-    loadRules()
-  }, [loadRules])
+    loadRules();
+  }, [loadRules]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
-    setSuccessMessage(null)
+    e.preventDefault();
+    setError(null);
+    setSuccessMessage(null);
 
-    // Validation
     if (!formData.name.trim()) {
-      setError('Rule name is required')
-      return
+      setError("Rule name is required");
+      return;
     }
     if (!formData.account_name.trim()) {
-      setError('Account name is required')
-      return
+      setError("Account name is required");
+      return;
     }
     if (formData.threshold <= 0) {
-      setError('Threshold must be greater than 0')
-      return
+      setError("Threshold must be greater than 0");
+      return;
     }
     if (formData.timeframe_hours <= 0) {
-      setError('Timeframe must be greater than 0 hours')
-      return
+      setError("Timeframe must be greater than 0 hours");
+      return;
     }
 
     try {
-      let response
+      let response;
       if (editingRule && editingRule.id) {
-        response = await AlerterService.updateRule(editingRule.id, formData)
+        response = await fetch(`/api/alerter-rules/${editingRule.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
       } else {
-        response = await AlerterService.createRule(formData)
+        response = await fetch("/api/alerter-rules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
       }
 
-      if (response.data) {
+      const data = await response.json();
+
+      if (data.data || data.rule_id) {
         setSuccessMessage(
-          editingRule ? `Successfully updated rule "${formData.name}"` : `Successfully created rule "${formData.name}"`
-        )
-        setShowCreateForm(false)
-        setEditingRule(null)
-        resetForm()
-        loadRules()
+          editingRule
+            ? `Successfully updated rule "${formData.name}"`
+            : `Successfully created rule "${formData.name}"`
+        );
+        setShowCreateForm(false);
+        setEditingRule(null);
+        resetForm();
+        loadRules();
       } else {
-        setError(response.message || 'Failed to save rule')
+        setError(data.message || "Failed to save rule");
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save rule'
-      setError(message)
+    } catch {
+      setError("Failed to save rule");
     }
-  }
+  };
 
   const handleDelete = async (rule: AlerterRule) => {
-    if (!rule.id) return
+    if (!rule.id) return;
     if (!confirm(`Are you sure you want to delete the rule "${rule.name}"? This action cannot be undone.`)) {
-      return
+      return;
     }
 
     try {
-      setError(null)
-      setSuccessMessage(null)
-      const response = await AlerterService.deleteRule(rule.id)
+      setError(null);
+      setSuccessMessage(null);
+      const response = await fetch(`/api/alerter-rules/${rule.id}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
 
-      if (response.message) {
-        setSuccessMessage(`Successfully deleted rule "${rule.name}"`)
-        loadRules()
+      if (data.message) {
+        setSuccessMessage(`Successfully deleted rule "${rule.name}"`);
+        loadRules();
       } else {
-        setError('Failed to delete rule')
+        setError("Failed to delete rule");
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to delete rule'
-      setError(message)
+    } catch {
+      setError("Failed to delete rule");
     }
-  }
+  };
 
   const handleToggleActive = async (rule: AlerterRule) => {
-    if (!rule.id) return
+    if (!rule.id) return;
 
     try {
-      setError(null)
-      setSuccessMessage(null)
+      setError(null);
+      setSuccessMessage(null);
 
-      const response = rule.is_active
-        ? await AlerterService.deactivateRule(rule.id)
-        : await AlerterService.activateRule(rule.id)
+      const endpoint = rule.is_active
+        ? `/api/alerter-rules/${rule.id}/deactivate`
+        : `/api/alerter-rules/${rule.id}/activate`;
 
-      if (response.message) {
-        setSuccessMessage(`Successfully ${rule.is_active ? 'deactivated' : 'activated'} rule "${rule.name}"`)
-        loadRules()
+      const response = await fetch(endpoint, { method: "POST" });
+      const data = await response.json();
+
+      if (data.message) {
+        setSuccessMessage(
+          `Successfully ${rule.is_active ? "deactivated" : "activated"} rule "${rule.name}"`
+        );
+        loadRules();
       } else {
-        setError(`Failed to ${rule.is_active ? 'deactivate' : 'activate'} rule`)
+        setError(`Failed to ${rule.is_active ? "deactivate" : "activate"} rule`);
       }
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to toggle rule status'
-      setError(message)
+    } catch {
+      setError("Failed to toggle rule status");
     }
-  }
+  };
 
   const startEdit = (rule: AlerterRule) => {
-    setEditingRule(rule)
+    setEditingRule(rule);
     setFormData({
       name: rule.name,
       scope: rule.scope,
@@ -194,41 +210,40 @@ export function AlertsConfig() {
       condition_type: rule.condition_type,
       threshold: rule.threshold,
       is_active: rule.is_active ?? true,
-    })
-    setShowCreateForm(true)
-  }
+    });
+    setShowCreateForm(true);
+  };
 
   const resetForm = () => {
     setFormData({
-      name: '',
-      scope: 'account',
-      account_name: '',
+      name: "",
+      scope: "account",
+      account_name: "",
       timeframe_hours: 2,
-      condition_type: 'cpa_threshold',
+      condition_type: "cpa_threshold",
       threshold: 0,
       is_active: true,
-    })
-  }
+    });
+  };
 
   const cancelEdit = () => {
-    setShowCreateForm(false)
-    setEditingRule(null)
-    resetForm()
-    setError(null)
-  }
+    setShowCreateForm(false);
+    setEditingRule(null);
+    resetForm();
+    setError(null);
+  };
 
-  // Filter rules based on search and filters
   const filteredRules = rules.filter((rule) => {
     const matchesSearch =
-      searchQuery === '' ||
+      searchQuery === "" ||
       rule.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      rule.account_name.toLowerCase().includes(searchQuery.toLowerCase())
+      rule.account_name.toLowerCase().includes(searchQuery.toLowerCase());
 
-    const matchesScope = filterScope === 'all' || rule.scope === filterScope
-    const matchesCondition = filterCondition === 'all' || rule.condition_type === filterCondition
+    const matchesScope = filterScope === "all" || rule.scope === filterScope;
+    const matchesCondition = filterCondition === "all" || rule.condition_type === filterCondition;
 
-    return matchesSearch && matchesScope && matchesCondition
-  })
+    return matchesSearch && matchesScope && matchesCondition;
+  });
 
   if (loading) {
     return (
@@ -236,14 +251,14 @@ export function AlertsConfig() {
         <div className="spinner"></div>
         <p>Loading alerter rules...</p>
       </div>
-    )
+    );
   }
 
   return (
     <div className="alerts-config-container">
       <div className="header">
         <div className="header-content">
-          <h1>🔔 Alerter Rules</h1>
+          <h1>Alerter Rules</h1>
           <p className="header-description">
             Create and manage intelligent alert rules for monitoring campaign performance
           </p>
@@ -251,9 +266,9 @@ export function AlertsConfig() {
         <button
           className="btn btn-primary"
           onClick={() => {
-            resetForm()
-            setEditingRule(null)
-            setShowCreateForm(true)
+            resetForm();
+            setEditingRule(null);
+            setShowCreateForm(true);
           }}
         >
           + Create New Rule
@@ -264,7 +279,7 @@ export function AlertsConfig() {
         <div className="alert alert-error">
           <strong>Error:</strong> {error}
           <button className="close-btn" onClick={() => setError(null)}>
-            ×
+            x
           </button>
         </div>
       )}
@@ -273,7 +288,7 @@ export function AlertsConfig() {
         <div className="alert alert-success">
           <strong>Success:</strong> {successMessage}
           <button className="close-btn" onClick={() => setSuccessMessage(null)}>
-            ×
+            x
           </button>
         </div>
       )}
@@ -281,15 +296,14 @@ export function AlertsConfig() {
       {showCreateForm && (
         <div className="create-form-card">
           <div className="form-header">
-            <h2>{editingRule ? `Edit Rule: ${editingRule.name}` : 'Create New Alerter Rule'}</h2>
+            <h2>{editingRule ? `Edit Rule: ${editingRule.name}` : "Create New Alerter Rule"}</h2>
             <button className="close-icon" onClick={cancelEdit}>
-              ×
+              x
             </button>
           </div>
 
           <form onSubmit={handleSubmit}>
             <div className="form-grid">
-              {/* Rule Name */}
               <div className="form-group full-width">
                 <label htmlFor="name">
                   Rule Name <span className="required">*</span>
@@ -305,7 +319,6 @@ export function AlertsConfig() {
                 <small className="form-help">A descriptive name to identify this rule</small>
               </div>
 
-              {/* Account Name */}
               <div className="form-group">
                 <label htmlFor="account_name">
                   Account Name <span className="required">*</span>
@@ -321,7 +334,6 @@ export function AlertsConfig() {
                 <small className="form-help">Account identifier (case-insensitive match)</small>
               </div>
 
-              {/* Timeframe Hours */}
               <div className="form-group">
                 <label htmlFor="timeframe_hours">
                   Timeframe (hours) <span className="required">*</span>
@@ -334,22 +346,24 @@ export function AlertsConfig() {
                   placeholder="e.g., 2"
                   value={formData.timeframe_hours}
                   onChange={(e) => {
-                    const value = e.target.value === '' ? '' : Math.round(Number(e.target.value));
-                    setFormData({ ...formData, timeframe_hours: value === '' ? 2 : value });
+                    const value = e.target.value === "" ? "" : Math.round(Number(e.target.value));
+                    setFormData({ ...formData, timeframe_hours: value === "" ? 2 : value });
                   }}
                   required
                 />
                 <small className="form-help">Time window for checking metrics (whole hours only)</small>
               </div>
 
-              {/* Scope Selection */}
               <div className="form-group full-width">
                 <label>
                   Alert Scope <span className="required">*</span>
                 </label>
                 <div className="radio-group">
                   {SCOPE_OPTIONS.map((option) => (
-                    <label key={option.value} className={`radio-card ${formData.scope === option.value ? 'selected' : ''}`}>
+                    <label
+                      key={option.value}
+                      className={`radio-card ${formData.scope === option.value ? "selected" : ""}`}
+                    >
                       <input
                         type="radio"
                         name="scope"
@@ -369,7 +383,6 @@ export function AlertsConfig() {
                 </div>
               </div>
 
-              {/* Condition Type Selection */}
               <div className="form-group full-width">
                 <label>
                   Condition Type <span className="required">*</span>
@@ -378,14 +391,16 @@ export function AlertsConfig() {
                   {CONDITION_OPTIONS.map((option) => (
                     <label
                       key={option.value}
-                      className={`radio-card ${formData.condition_type === option.value ? 'selected' : ''}`}
+                      className={`radio-card ${formData.condition_type === option.value ? "selected" : ""}`}
                     >
                       <input
                         type="radio"
                         name="condition_type"
                         value={option.value}
                         checked={formData.condition_type === option.value}
-                        onChange={(e) => setFormData({ ...formData, condition_type: e.target.value as ConditionType })}
+                        onChange={(e) =>
+                          setFormData({ ...formData, condition_type: e.target.value as ConditionType })
+                        }
                       />
                       <div className="radio-content">
                         <span className="radio-icon">{option.icon}</span>
@@ -399,41 +414,37 @@ export function AlertsConfig() {
                 </div>
               </div>
 
-              {/* Threshold */}
               <div className="form-group">
                 <label htmlFor="threshold">
                   Threshold Value <span className="required">*</span>
                 </label>
                 <div className="input-with-prefix">
                   <span className="input-prefix">
-                    {formData.condition_type === 'weekly_cpa_increase' ? '%' : '$'}
+                    {formData.condition_type === "weekly_cpa_increase" ? "%" : "$"}
                   </span>
                   <input
                     id="threshold"
                     type="number"
                     min="0"
-                    step={formData.condition_type === 'weekly_cpa_increase' ? '1' : '0.01'}
-                    placeholder={
-                      formData.condition_type === 'weekly_cpa_increase' ? 'e.g., 20' : 'e.g., 65.00'
-                    }
-                    value={formData.threshold || ''}
+                    step={formData.condition_type === "weekly_cpa_increase" ? "1" : "0.01"}
+                    placeholder={formData.condition_type === "weekly_cpa_increase" ? "e.g., 20" : "e.g., 65.00"}
+                    value={formData.threshold || ""}
                     onChange={(e) => {
-                      const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
+                      const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
                       setFormData({ ...formData, threshold: value });
                     }}
                     required
                   />
                 </div>
                 <small className="form-help">
-                  {formData.condition_type === 'cpa_threshold'
-                    ? 'Alert when CPA reaches this amount'
-                    : formData.condition_type === 'zero_conv_spend'
-                    ? 'Alert when spend reaches this amount with 0 conversions'
-                    : 'Alert when CPA increases by this percentage vs last week'}
+                  {formData.condition_type === "cpa_threshold"
+                    ? "Alert when CPA reaches this amount"
+                    : formData.condition_type === "zero_conv_spend"
+                    ? "Alert when spend reaches this amount with 0 conversions"
+                    : "Alert when CPA increases by this percentage vs last week"}
                 </small>
               </div>
 
-              {/* Active Toggle */}
               <div className="form-group">
                 <label htmlFor="is_active">Status</label>
                 <label className="toggle-switch">
@@ -444,7 +455,7 @@ export function AlertsConfig() {
                     onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
                   />
                   <span className="toggle-slider"></span>
-                  <span className="toggle-label">{formData.is_active ? 'Active' : 'Inactive'}</span>
+                  <span className="toggle-label">{formData.is_active ? "Active" : "Inactive"}</span>
                 </label>
                 <small className="form-help">Only active rules will trigger alerts</small>
               </div>
@@ -452,7 +463,7 @@ export function AlertsConfig() {
 
             <div className="form-actions">
               <button type="submit" className="btn btn-primary">
-                {editingRule ? 'Update Rule' : 'Create Rule'}
+                {editingRule ? "Update Rule" : "Create Rule"}
               </button>
               <button type="button" className="btn btn-secondary" onClick={cancelEdit}>
                 Cancel
@@ -462,7 +473,6 @@ export function AlertsConfig() {
         </div>
       )}
 
-      {/* Filters and Search */}
       <div className="filters-section">
         <div className="search-box">
           <input
@@ -474,19 +484,20 @@ export function AlertsConfig() {
         </div>
 
         <div className="filter-group">
-          <select value={filterScope} onChange={(e) => setFilterScope(e.target.value as RuleScope | 'all')}>
+          <select value={filterScope} onChange={(e) => setFilterScope(e.target.value as RuleScope | "all")}>
             <option value="all">All Scopes</option>
-            <option value="account">🏢 Account Level</option>
-            <option value="campaign">📊 Campaign Level</option>
+            <option value="account">Account Level</option>
+            <option value="campaign">Campaign Level</option>
           </select>
 
           <select
             value={filterCondition}
-            onChange={(e) => setFilterCondition(e.target.value as ConditionType | 'all')}
+            onChange={(e) => setFilterCondition(e.target.value as ConditionType | "all")}
           >
             <option value="all">All Conditions</option>
-            <option value="cpa_threshold">💰 CPA Threshold</option>
-            <option value="zero_conv_spend">❌ Zero Conversions</option>
+            <option value="cpa_threshold">CPA Threshold</option>
+            <option value="zero_conv_spend">Zero Conversions</option>
+            <option value="weekly_cpa_increase">Weekly CPA Increase</option>
           </select>
 
           <label className="checkbox-label">
@@ -496,7 +507,6 @@ export function AlertsConfig() {
         </div>
       </div>
 
-      {/* Rules List */}
       <div className="rules-section">
         <div className="section-header">
           <h2>Active Rules ({filteredRules.length})</h2>
@@ -504,23 +514,23 @@ export function AlertsConfig() {
 
         {filteredRules.length === 0 ? (
           <div className="empty-state">
-            <div className="empty-icon">🔍</div>
+            <div className="empty-icon">?</div>
             <p>No rules found</p>
             <p className="empty-subtext">
-              {searchQuery || filterScope !== 'all' || filterCondition !== 'all'
-                ? 'Try adjusting your filters'
-                : 'Create your first alerter rule to get started'}
+              {searchQuery || filterScope !== "all" || filterCondition !== "all"
+                ? "Try adjusting your filters"
+                : "Create your first alerter rule to get started"}
             </p>
           </div>
         ) : (
           <div className="rules-grid">
             {filteredRules.map((rule) => (
-              <div key={rule.id} className={`rule-card ${!rule.is_active ? 'inactive' : ''}`}>
+              <div key={rule.id} className={`rule-card ${!rule.is_active ? "inactive" : ""}`}>
                 <div className="rule-header">
                   <h3>{rule.name}</h3>
                   <div className="rule-badges">
-                    <span className={`badge ${rule.is_active ? 'active' : 'inactive'}`}>
-                      {rule.is_active ? '✓ Active' : '○ Inactive'}
+                    <span className={`badge ${rule.is_active ? "active" : "inactive"}`}>
+                      {rule.is_active ? "Active" : "Inactive"}
                     </span>
                   </div>
                 </div>
@@ -534,25 +544,25 @@ export function AlertsConfig() {
                   <div className="rule-detail">
                     <span className="detail-label">Scope:</span>
                     <span className="detail-value">
-                      {rule.scope === 'account' ? '🏢 Account Level' : '📊 Campaign Level'}
+                      {rule.scope === "account" ? "Account Level" : "Campaign Level"}
                     </span>
                   </div>
 
                   <div className="rule-detail">
                     <span className="detail-label">Condition:</span>
                     <span className="detail-value">
-                      {rule.condition_type === 'cpa_threshold'
-                        ? '💰 CPA Threshold'
-                        : rule.condition_type === 'zero_conv_spend'
-                        ? '❌ Zero Conversions'
-                        : '📈 Weekly CPA Increase'}
+                      {rule.condition_type === "cpa_threshold"
+                        ? "CPA Threshold"
+                        : rule.condition_type === "zero_conv_spend"
+                        ? "Zero Conversions"
+                        : "Weekly CPA Increase"}
                     </span>
                   </div>
 
                   <div className="rule-detail">
                     <span className="detail-label">Threshold:</span>
                     <span className="detail-value threshold">
-                      {rule.condition_type === 'weekly_cpa_increase'
+                      {rule.condition_type === "weekly_cpa_increase"
                         ? `${Number(rule.threshold).toFixed(0)}%`
                         : `$${Number(rule.threshold).toFixed(2)}`}
                     </span>
@@ -560,7 +570,9 @@ export function AlertsConfig() {
 
                   <div className="rule-detail">
                     <span className="detail-label">Timeframe:</span>
-                    <span className="detail-value">{Number(rule.timeframe_hours)} hour{Number(rule.timeframe_hours) !== 1 ? 's' : ''}</span>
+                    <span className="detail-value">
+                      {Number(rule.timeframe_hours)} hour{Number(rule.timeframe_hours) !== 1 ? "s" : ""}
+                    </span>
                   </div>
                 </div>
 
@@ -572,15 +584,15 @@ export function AlertsConfig() {
                     <button
                       className="btn btn-sm btn-secondary"
                       onClick={() => handleToggleActive(rule)}
-                      title={rule.is_active ? 'Deactivate' : 'Activate'}
+                      title={rule.is_active ? "Deactivate" : "Activate"}
                     >
-                      {rule.is_active ? '⏸' : '▶'}
+                      {rule.is_active ? "Pause" : "Play"}
                     </button>
                     <button className="btn btn-sm btn-secondary" onClick={() => startEdit(rule)}>
-                      ✏️ Edit
+                      Edit
                     </button>
                     <button className="btn btn-sm btn-danger" onClick={() => handleDelete(rule)}>
-                      🗑️ Delete
+                      Delete
                     </button>
                   </div>
                 </div>
@@ -590,5 +602,5 @@ export function AlertsConfig() {
         )}
       </div>
     </div>
-  )
+  );
 }

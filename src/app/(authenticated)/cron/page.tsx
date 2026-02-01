@@ -1,98 +1,93 @@
-import { useState } from 'react'
-import '../styles/CronSync.css'
+"use client";
 
-const API_BASE_URL = 'http://localhost:5000'
+import { useState } from "react";
 
 interface SyncResponse {
-  success: boolean
-  message: string
-  data?: Record<string, unknown>
-  syncStatus?: string
-  errors?: string[]
-  detailedErrors?: Record<string, unknown>[]
+  success: boolean;
+  message: string;
+  data?: Record<string, unknown>;
+  syncStatus?: string;
+  errors?: string[];
 }
 
 interface CronEndpoint {
-  title: string
-  description: string
-  endpoint: string
-  params?: { name: string; defaultValue: number; min: number; max: number; label: string }[]
+  title: string;
+  description: string;
+  endpoint: string;
+  params?: { name: string; defaultValue: number; min: number; max: number; label: string }[];
 }
 
 const realtimeEndpoints: CronEndpoint[] = [
   {
-    title: 'Realtime Threshold Alerts',
-    description: 'Run rule-based threshold alerts (uses alerter rules - no hours parameter needed)',
-    endpoint: 'taboola/sync-realtime-reports-threshold',
-    // No params - uses alerter rules for timeframes
+    title: "Realtime Threshold Alerts",
+    description: "Run rule-based threshold alerts (uses alerter rules - no hours parameter needed)",
+    endpoint: "taboola/sync-realtime-reports-threshold",
   },
   {
-    title: 'Realtime Comparison',
-    description: 'Compare current X hours vs previous X hours',
-    endpoint: 'taboola/sync-realtime-reports-comparison',
-    params: [{ name: 'hours', defaultValue: 2, min: 1, max: 24, label: 'Hours' }],
+    title: "Realtime Comparison",
+    description: "Compare current X hours vs previous X hours",
+    endpoint: "taboola/sync-realtime-reports-comparison",
+    params: [{ name: "hours", defaultValue: 2, min: 1, max: 24, label: "Hours" }],
   },
   {
-    title: 'Weekly Comparison',
-    description: 'Run rule-based weekly CPA comparison (uses alerter rules - no hours parameter needed)',
-    endpoint: 'taboola/sync-weekly-comparison',
-    // No params - uses alerter rules for timeframes
+    title: "Weekly Comparison",
+    description: "Run rule-based weekly CPA comparison (uses alerter rules - no hours parameter needed)",
+    endpoint: "taboola/sync-weekly-comparison",
   },
   {
-    title: 'Realtime vs Historical',
-    description: 'Compare realtime X hours vs Y days historical average',
-    endpoint: 'taboola/sync-realtime-vs-historical',
+    title: "Realtime vs Historical",
+    description: "Compare realtime X hours vs Y days historical average",
+    endpoint: "taboola/sync-realtime-vs-historical",
     params: [
-      { name: 'hours', defaultValue: 2, min: 1, max: 24, label: 'Hours (Realtime)' },
-      { name: 'days', defaultValue: 2, min: 1, max: 30, label: 'Days (Historical)' },
+      { name: "hours", defaultValue: 2, min: 1, max: 24, label: "Hours (Realtime)" },
+      { name: "days", defaultValue: 2, min: 1, max: 30, label: "Days (Historical)" },
     ],
   },
-]
+];
 
-export function CronSync() {
-  const [loading, setLoading] = useState<string | null>(null)
-  const [response, setResponse] = useState<SyncResponse | null>(null)
-  const [paramValues, setParamValues] = useState<Record<string, Record<string, number>>>({})
+export default function CronPage() {
+  const [loading, setLoading] = useState<string | null>(null);
+  const [response, setResponse] = useState<SyncResponse | null>(null);
+  const [paramValues, setParamValues] = useState<Record<string, Record<string, number>>>({});
 
   const handleSync = async (endpoint: string, params?: Record<string, number>) => {
-    setLoading(endpoint)
-    setResponse(null)
+    setLoading(endpoint);
+    setResponse(null);
 
     try {
       const queryParams = params
         ? new URLSearchParams(
             Object.entries(params).reduce((acc, [key, value]) => {
-              acc[key] = String(value)
-              return acc
+              acc[key] = String(value);
+              return acc;
             }, {} as Record<string, string>)
           )
-        : ''
+        : "";
 
-      const url = `${API_BASE_URL}/api/cron/${endpoint}${queryParams ? `?${queryParams}` : ''}`
+      const url = `/api/cron/${endpoint}${queryParams ? `?${queryParams}` : ""}`;
 
       const res = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-      })
+      });
 
-      const data = await res.json()
-      setResponse(data)
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : 'Request failed'
+      const data = await res.json();
+      setResponse(data);
+    } catch {
       setResponse({
         success: false,
-        message,
-      })
+        message: "Request failed",
+      });
     } finally {
-      setLoading(null)
+      setLoading(null);
     }
-  }
+  };
 
   const getParamValue = (endpoint: string, paramName: string, defaultValue: number) => {
-    return paramValues[endpoint]?.[paramName] ?? defaultValue
-  }
+    return paramValues[endpoint]?.[paramName] ?? defaultValue;
+  };
 
   const setParamValue = (endpoint: string, paramName: string, value: number) => {
     setParamValues((prev) => ({
@@ -101,8 +96,8 @@ export function CronSync() {
         ...prev[endpoint],
         [paramName]: value,
       },
-    }))
-  }
+    }));
+  };
 
   return (
     <div className="cron-sync-container">
@@ -115,12 +110,12 @@ export function CronSync() {
               <p className="description">{item.description}</p>
               <form
                 onSubmit={(e) => {
-                  e.preventDefault()
+                  e.preventDefault();
                   const params = item.params?.reduce((acc, param) => {
-                    acc[param.name] = getParamValue(item.endpoint, param.name, param.defaultValue)
-                    return acc
-                  }, {} as Record<string, number>)
-                  handleSync(item.endpoint, params)
+                    acc[param.name] = getParamValue(item.endpoint, param.name, param.defaultValue);
+                    return acc;
+                  }, {} as Record<string, number>);
+                  handleSync(item.endpoint, params);
                 }}
               >
                 {item.params?.map((param) => (
@@ -139,7 +134,7 @@ export function CronSync() {
                   </div>
                 ))}
                 <button type="submit" disabled={loading === item.endpoint}>
-                  {loading === item.endpoint ? 'Syncing...' : 'Sync'}
+                  {loading === item.endpoint ? "Syncing..." : "Sync"}
                 </button>
               </form>
             </div>
@@ -148,10 +143,10 @@ export function CronSync() {
       </section>
 
       {response && (
-        <div className={`response-card ${response.success ? 'success' : 'error'}`}>
+        <div className={`response-card ${response.success ? "success" : "error"}`}>
           <h3>Response</h3>
           <div className="response-status">
-            <strong>Status:</strong> {response.success ? '✓ Success' : '✗ Failed'}
+            <strong>Status:</strong> {response.success ? "Success" : "Failed"}
             {response.syncStatus && <span> ({response.syncStatus})</span>}
           </div>
           <div className="response-message">
@@ -178,5 +173,5 @@ export function CronSync() {
         </div>
       )}
     </div>
-  )
+  );
 }

@@ -1,5 +1,3 @@
-// TypeScript types for Alerter Rules API - matches campaign-creation-backend
-
 export type RuleScope = 'account' | 'campaign'
 export type ConditionType = 'cpa_threshold' | 'zero_conv_spend' | 'weekly_cpa_increase'
 
@@ -29,16 +27,6 @@ export interface AlerterRulesListResponse {
   count?: number
   account_name?: string
   scope?: RuleScope
-  error?: string
-  details?: string
-}
-
-export interface AlerterStatsResponse {
-  data?: {
-    total_rules: number
-    active_rules: number
-    inactive_rules: number
-  }
   error?: string
   details?: string
 }
