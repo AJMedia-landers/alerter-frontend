@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API = process.env.API_BASE_URL!;
+import { getApiBaseUrl } from "@/lib/config";
 
 export async function GET(req: NextRequest) {
   const token = (await cookies()).get("token")?.value;
@@ -11,7 +10,7 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url);
   const active = searchParams.get("active");
-  const url = active ? `${API}/api/alerter-rules?active=${active}` : `${API}/api/alerter-rules`;
+  const url = active ? `${getApiBaseUrl()}/api/alerter-rules?active=${active}` : `${getApiBaseUrl()}/api/alerter-rules`;
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
@@ -29,7 +28,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json();
 
-  const res = await fetch(`${API}/api/alerter-rules`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/alerter-rules`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

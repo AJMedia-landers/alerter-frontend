@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API = process.env.API_BASE_URL!;
+import { getApiBaseUrl } from "@/lib/config";
 
 export async function GET(
   req: NextRequest,
@@ -14,7 +13,7 @@ export async function GET(
 
   const { id } = await params;
 
-  const res = await fetch(`${API}/api/alerter-rules/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/alerter-rules/${id}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -34,7 +33,7 @@ export async function PATCH(
   const { id } = await params;
   const body = await req.json();
 
-  const res = await fetch(`${API}/api/alerter-rules/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/alerter-rules/${id}`, {
     method: "PATCH",
     headers: {
       "Content-Type": "application/json",
@@ -58,7 +57,7 @@ export async function DELETE(
 
   const { id } = await params;
 
-  const res = await fetch(`${API}/api/alerter-rules/${id}`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/alerter-rules/${id}`, {
     method: "DELETE",
     headers: { Authorization: `Bearer ${token}` },
   });

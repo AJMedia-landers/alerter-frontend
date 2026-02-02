@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API = process.env.API_BASE_URL!;
+import { getApiBaseUrl } from "@/lib/config";
 
 export async function GET(
   req: NextRequest,
@@ -16,7 +15,7 @@ export async function GET(
   const pathStr = path.join("/");
   const { searchParams } = new URL(req.url);
   const queryString = searchParams.toString();
-  const url = `${API}/api/cron/${pathStr}${queryString ? `?${queryString}` : ""}`;
+  const url = `${getApiBaseUrl()}/api/cron/${pathStr}${queryString ? `?${queryString}` : ""}`;
 
   const res = await fetch(url, {
     headers: {

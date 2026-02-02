@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-
-const API = process.env.API_BASE_URL!;
+import { getApiBaseUrl } from "@/lib/config";
 
 export async function POST(
   req: NextRequest,
@@ -14,7 +13,7 @@ export async function POST(
 
   const { id } = await params;
 
-  const res = await fetch(`${API}/api/alerter-rules/${id}/deactivate`, {
+  const res = await fetch(`${getApiBaseUrl()}/api/alerter-rules/${id}/deactivate`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
   });
