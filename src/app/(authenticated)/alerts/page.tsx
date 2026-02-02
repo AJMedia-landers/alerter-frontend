@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { AlerterRule, RuleScope, ConditionType, Platform } from "@/types/alerter";
+import type { AlerterRule, RuleScope, ConditionType, Platform, Severity } from "@/types/alerter";
 
 const SCOPE_OPTIONS: { value: RuleScope; label: string; description: string; icon: string }[] = [
   {
@@ -61,6 +61,32 @@ const PLATFORM_OPTIONS: {
   },
 ];
 
+const SEVERITY_OPTIONS: {
+  value: Severity;
+  label: string;
+  description: string;
+  color: string;
+}[] = [
+  {
+    value: 1,
+    label: "SEV-1 (Critical)",
+    description: "Critical alerts requiring immediate attention",
+    color: "#dc2626",
+  },
+  {
+    value: 2,
+    label: "SEV-2 (Warning)",
+    description: "Warning alerts for monitoring",
+    color: "#f59e0b",
+  },
+  {
+    value: 3,
+    label: "SEV-3 (Info)",
+    description: "Informational alerts",
+    color: "#3b82f6",
+  },
+];
+
 export default function AlertsPage() {
   const [rules, setRules] = useState<AlerterRule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +99,7 @@ export default function AlertsPage() {
   const [filterScope, setFilterScope] = useState<RuleScope | "all">("all");
   const [filterCondition, setFilterCondition] = useState<ConditionType | "all">("all");
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
+  const [filterSeverity, setFilterSeverity] = useState<Severity | "all">("all");
 
   const [formData, setFormData] = useState<Omit<AlerterRule, "id" | "created_at" | "updated_at">>({
     name: "",
@@ -82,6 +109,8 @@ export default function AlertsPage() {
     timeframe_hours: 2,
     condition_type: "cpa_threshold",
     threshold: 0,
+    severity: 2,
+    min_spend: null,
     is_active: true,
   });
 
@@ -229,6 +258,8 @@ export default function AlertsPage() {
       timeframe_hours: rule.timeframe_hours,
       condition_type: rule.condition_type,
       threshold: rule.threshold,
+      severity: rule.severity ?? 2,
+      min_spend: rule.min_spend ?? null,
       is_active: rule.is_active ?? true,
     });
     setShowCreateForm(true);
@@ -243,6 +274,8 @@ export default function AlertsPage() {
       timeframe_hours: 2,
       condition_type: "cpa_threshold",
       threshold: 0,
+      severity: 2,
+      min_spend: null,
       is_active: true,
     });
   };
@@ -263,8 +296,9 @@ export default function AlertsPage() {
     const matchesScope = filterScope === "all" || rule.scope === filterScope;
     const matchesCondition = filterCondition === "all" || rule.condition_type === filterCondition;
     const matchesPlatform = filterPlatform === "all" || (rule.platform ?? "taboola") === filterPlatform;
+    const matchesSeverity = filterSeverity === "all" || (rule.severity ?? 2) === filterSeverity;
 
-    return matchesSearch && matchesScope && matchesCondition && matchesPlatform;
+    return matchesSearch && matchesScope && matchesCondition && matchesPlatform && matchesSeverity;
   });
 
   if (loading) {
@@ -460,9 +494,12 @@ export default function AlertsPage() {
                         name="condition_type"
                         value={option.value}
                         checked={formData.condition_type === option.value}
-                        onChange={(e) =>
-                          setFormData({ ...formData, condition_type: e.target.value as ConditionType })
-                        }
+                        onChange={(e) => {
+                          const newConditionType = e.target.value as ConditionType;
+                          // Clear min_spend when switching to zero_conv_spend (uses threshold as spend)
+                          const newMinSpend = newConditionType === "zero_conv_spend" ? null : formData.min_spend;
+                          setFormData({ ...formData, condition_type: newConditionType, min_spend: newMinSpend });
+                        }}
                       />
                       <div className="radio-content">
                         <span className="radio-icon">{option.icon}</span>
@@ -504,6 +541,51 @@ export default function AlertsPage() {
                     : formData.condition_type === "zero_conv_spend"
                     ? "Alert when spend reaches this amount with 0 conversions"
                     : "Alert when CPA increases by this percentage vs last week"}
+                </small>
+              </div>
+
+              {formData.condition_type !== "zero_conv_spend" && (
+                <div className="form-group">
+                  <label htmlFor="min_spend">Minimum Spend (optional)</label>
+                  <div className="input-with-prefix">
+                    <span className="input-prefix">$</span>
+                    <input
+                      id="min_spend"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="e.g., 50.00"
+                      value={formData.min_spend ?? ""}
+                      onChange={(e) => {
+                        const value = e.target.value === "" ? null : parseFloat(e.target.value);
+                        setFormData({ ...formData, min_spend: value });
+                      }}
+                    />
+                  </div>
+                  <small className="form-help">
+                    Only trigger alert if spend exceeds this amount (leave empty to ignore)
+                  </small>
+                </div>
+              )}
+
+              <div className="form-group">
+                <label htmlFor="severity">
+                  Severity Level <span className="required">*</span>
+                </label>
+                <select
+                  id="severity"
+                  value={formData.severity}
+                  onChange={(e) => setFormData({ ...formData, severity: Number(e.target.value) as Severity })}
+                  required
+                >
+                  {SEVERITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+                <small className="form-help">
+                  Determines which Slack channel receives alerts (SEV-1: critical, SEV-2: warning, SEV-3: info)
                 </small>
               </div>
 
@@ -568,6 +650,16 @@ export default function AlertsPage() {
             <option value="weekly_cpa_increase">Weekly CPA Increase</option>
           </select>
 
+          <select
+            value={filterSeverity}
+            onChange={(e) => setFilterSeverity(e.target.value === "all" ? "all" : (Number(e.target.value) as Severity))}
+          >
+            <option value="all">All Severities</option>
+            <option value="1">SEV-1 (Critical)</option>
+            <option value="2">SEV-2 (Warning)</option>
+            <option value="3">SEV-3 (Info)</option>
+          </select>
+
           <label className="checkbox-label">
             <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} />
             Show inactive rules
@@ -599,6 +691,9 @@ export default function AlertsPage() {
                   <div className="rule-badges">
                     <span className={`badge platform ${rule.platform ?? "taboola"}`}>
                       {(rule.platform ?? "taboola").charAt(0).toUpperCase() + (rule.platform ?? "taboola").slice(1)}
+                    </span>
+                    <span className={`badge severity sev-${rule.severity ?? 2}`}>
+                      SEV-{rule.severity ?? 2}
                     </span>
                     <span className={`badge ${rule.is_active ? "active" : "inactive"}`}>
                       {rule.is_active ? "Active" : "Inactive"}
@@ -646,10 +741,24 @@ export default function AlertsPage() {
                     </span>
                   </div>
 
+                  {rule.condition_type !== "zero_conv_spend" && rule.min_spend != null && (
+                    <div className="rule-detail">
+                      <span className="detail-label">Min Spend:</span>
+                      <span className="detail-value">${Number(rule.min_spend).toFixed(2)}</span>
+                    </div>
+                  )}
+
                   <div className="rule-detail">
                     <span className="detail-label">Timeframe:</span>
                     <span className="detail-value">
                       {Number(rule.timeframe_hours)} hour{Number(rule.timeframe_hours) !== 1 ? "s" : ""}
+                    </span>
+                  </div>
+
+                  <div className="rule-detail">
+                    <span className="detail-label">Severity:</span>
+                    <span className={`detail-value severity-badge sev-${rule.severity ?? 2}`}>
+                      {SEVERITY_OPTIONS.find((s) => s.value === (rule.severity ?? 2))?.label ?? "SEV-2 (Warning)"}
                     </span>
                   </div>
                 </div>

@@ -1,6 +1,7 @@
 export type RuleScope = 'account' | 'campaign'
 export type ConditionType = 'cpa_threshold' | 'zero_conv_spend' | 'weekly_cpa_increase'
 export type Platform = 'taboola' | 'outbrain'
+export type Severity = 1 | 2 | 3
 
 export interface AlerterRule {
   id?: number
@@ -11,6 +12,8 @@ export interface AlerterRule {
   timeframe_hours: number
   condition_type: ConditionType
   threshold: number
+  severity: Severity
+  min_spend?: number | null
   is_active?: boolean
   created_at?: string
   updated_at?: string
