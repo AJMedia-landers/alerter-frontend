@@ -1,6 +1,6 @@
 # Taboola Realtime Sync Dashboard
 
-A React frontend dashboard for managing and triggering Taboola realtime sync operations.
+A Next.js frontend dashboard for managing and triggering Taboola realtime sync operations.
 
 ## Features
 
@@ -24,11 +24,11 @@ This dashboard provides an interface to trigger three different types of realtim
 docker compose --profile dev up frontend-dev
 ```
 
-The app will be available at `http://localhost:5173` with hot reload enabled.
+The app will be available at `http://localhost:3001` with hot reload enabled.
 
 2. (Optional) Configure custom backend API URL:
 ```bash
-VITE_API_BASE_URL=https://api.example.com docker compose --profile dev up frontend-dev
+API_BASE_URL=https://api.example.com docker compose --profile dev up frontend-dev
 ```
 
 ### Production Mode
@@ -42,7 +42,7 @@ docker compose up -d
 
 With custom API URL:
 ```bash
-VITE_API_BASE_URL=https://api.production.com docker compose up -d --build
+API_BASE_URL=https://api.production.com docker compose up -d --build
 ```
 
 ## API Endpoints
@@ -70,8 +70,8 @@ The frontend connects to the following backend endpoints:
 # Build production container
 docker compose build
 
-# Or build with custom API URL
-VITE_API_BASE_URL=https://api.production.com docker compose build
+# Or build and run with custom API URL
+API_BASE_URL=https://api.production.com docker compose up -d --build
 ```
 
 ## Docker Commands Reference
@@ -87,15 +87,13 @@ VITE_API_BASE_URL=https://api.production.com docker compose build
 ## Health Check
 
 ```bash
-curl http://localhost:8080/health
-# Returns: OK
+curl http://localhost:8080/
 ```
 
 For complete deployment options and advanced configuration, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ## Tech Stack
 
+- Next.js 15
 - React 19
 - TypeScript
-- Vite
-- SWC for Fast Refresh

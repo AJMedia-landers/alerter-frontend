@@ -8,7 +8,6 @@ This guide covers all deployment options for the Taboola Realtime Sync Dashboard
 - [Environment Variables](#environment-variables)
 - [Local Development](#local-development)
 - [Docker Deployment](#docker-deployment)
-- [Static Hosting (via Docker Build)](#static-hosting-via-docker-build)
 - [Production Checklist](#production-checklist)
 - [Troubleshooting](#troubleshooting)
 - [Alternative: Native Node.js Setup](#alternative-native-nodejs-setup)
@@ -29,7 +28,7 @@ This guide covers all deployment options for the Taboola Realtime Sync Dashboard
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| `VITE_API_BASE_URL` | Backend API URL | `http://localhost:3000` | Yes |
+| `API_BASE_URL` | Backend API URL (server-side) | `http://localhost:5000` | Yes |
 
 Create a `.env` file from the example:
 
@@ -40,7 +39,7 @@ cp .env.example .env
 Edit `.env` with your configuration:
 
 ```bash
-VITE_API_BASE_URL=https://your-backend-api.com
+API_BASE_URL=https://your-backend-api.com
 ```
 
 ---
@@ -53,12 +52,12 @@ Start the development server with hot reload:
 docker compose --profile dev up frontend-dev
 ```
 
-The app runs at `http://localhost:5173`
+The app runs at `http://localhost:3001`
 
 ### With Custom API URL
 
 ```bash
-VITE_API_BASE_URL=https://api.example.com docker compose --profile dev up frontend-dev
+API_BASE_URL=https://api.example.com docker compose --profile dev up frontend-dev
 ```
 
 ### Development Commands
@@ -86,8 +85,8 @@ docker compose up -d
 ### Custom Configuration
 
 ```bash
-# Build with custom API URL
-VITE_API_BASE_URL=https://api.production.com docker compose up -d --build
+# Run with custom API URL
+API_BASE_URL=https://api.production.com docker compose up -d --build
 
 # Run on different port
 PORT=3000 docker compose up -d
@@ -97,22 +96,21 @@ PORT=3000 docker compose up -d
 
 ```bash
 # Build the image
-docker build \
-  --build-arg VITE_API_BASE_URL=https://api.production.com \
-  -t taboola-dashboard:latest .
+docker build -t alerter-dashboard:latest .
 
 # Run the container
 docker run -d \
-  --name taboola-dashboard \
-  -p 8080:80 \
+  --name alerter-dashboard \
+  -p 8080:3000 \
+  -e API_BASE_URL=https://api.production.com \
   --restart unless-stopped \
-  taboola-dashboard:latest
+  alerter-dashboard:latest
 
 # View logs
-docker logs -f taboola-dashboard
+docker logs -f alerter-dashboard
 
 # Stop and remove
-docker stop taboola-dashboard && docker rm taboola-dashboard
+docker stop alerter-dashboard && docker rm alerter-dashboard
 ```
 
 ### Health Check
@@ -120,86 +118,7 @@ docker stop taboola-dashboard && docker rm taboola-dashboard
 The container exposes a health endpoint:
 
 ```bash
-curl http://localhost:8080/health
-# Returns: OK
-```
-
----
-
-## Static Hosting (via Docker Build)
-
-Extract the production build from Docker for static hosting:
-
-### Build and Extract
-
-```bash
-# Build the production image
-docker compose build
-
-# Extract dist files from the container
-docker create --name temp-extract taboola-dashboard:latest
-docker cp temp-extract:/usr/share/nginx/html ./dist
-docker rm temp-extract
-```
-
-Or build with a custom API URL:
-
-```bash
-VITE_API_BASE_URL=https://api.production.com docker compose build
-```
-
-### Deploy to AWS S3 + CloudFront
-
-```bash
-# Extract build files (see above), then:
-aws s3 sync dist/ s3://your-bucket-name --delete
-
-# Invalidate CloudFront cache (optional)
-aws cloudfront create-invalidation \
-  --distribution-id YOUR_DISTRIBUTION_ID \
-  --paths "/*"
-```
-
-### Deploy to Vercel
-
-```bash
-# Extract build files (see above), then:
-npx vercel --prod ./dist
-```
-
-### Deploy to Netlify
-
-```bash
-# Extract build files (see above), then:
-npx netlify deploy --prod --dir=dist
-```
-
-### Deploy to Remote Server with Docker
-
-The recommended approach for remote servers is to run the Docker container directly:
-
-```bash
-# On your remote server
-docker pull your-registry/taboola-dashboard:latest
-docker run -d \
-  --name taboola-dashboard \
-  -p 8080:80 \
-  --restart unless-stopped \
-  your-registry/taboola-dashboard:latest
-```
-
-Or copy the image directly:
-
-```bash
-# Save image locally
-docker save taboola-dashboard:latest | gzip > dashboard.tar.gz
-
-# Copy to server
-scp dashboard.tar.gz user@server:/tmp/
-
-# On server: load and run
-docker load < /tmp/dashboard.tar.gz
-docker run -d --name taboola-dashboard -p 8080:80 --restart unless-stopped taboola-dashboard:latest
+curl http://localhost:8080/
 ```
 
 ---
@@ -208,27 +127,20 @@ docker run -d --name taboola-dashboard -p 8080:80 --restart unless-stopped taboo
 
 ### Before Deployment
 
-- [ ] Set correct `VITE_API_BASE_URL` for production
+- [ ] Set correct `API_BASE_URL` for production
 - [ ] Verify backend API is accessible from deployment environment
 - [ ] Configure CORS on backend to allow frontend domain
-- [ ] Test production build locally: `docker compose up -d && curl http://localhost:8080/health`
+- [ ] Test production build locally: `docker compose up -d && curl http://localhost:8080/`
 
 ### Security
 
 - [ ] Enable HTTPS (SSL/TLS certificate)
-- [ ] Configure security headers (included in nginx.conf)
 - [ ] Set up rate limiting on API endpoints
 - [ ] Review and restrict CORS origins on backend
 
-### Performance
-
-- [ ] Enable gzip compression (included in nginx.conf)
-- [ ] Configure CDN for static assets
-- [ ] Set up caching headers (included in nginx.conf)
-
 ### Monitoring
 
-- [ ] Set up health check monitoring (`/health` endpoint)
+- [ ] Set up health check monitoring
 - [ ] Configure error tracking (e.g., Sentry)
 - [ ] Set up log aggregation
 
@@ -255,15 +167,9 @@ app.use(cors({
 **Symptom**: Network errors when calling API endpoints.
 
 **Solution**:
-1. Verify `VITE_API_BASE_URL` is correct
+1. Verify `API_BASE_URL` is correct
 2. Ensure backend is running and accessible
 3. Check firewall rules allow traffic on API port
-
-### 404 on Page Refresh
-
-**Symptom**: Refreshing a page other than `/` returns 404.
-
-**Solution**: Ensure your web server is configured for SPA routing (serve `index.html` for all routes). The provided `nginx.conf` handles this.
 
 ### Docker Build Fails
 
@@ -277,10 +183,10 @@ app.use(cors({
 
 **Symptom**: API URL is still localhost in production.
 
-**Solution**: Vite embeds environment variables at build time. Rebuild with correct variables:
+**Solution**: Pass the environment variable when running the container:
 
 ```bash
-VITE_API_BASE_URL=https://api.production.com docker compose up -d --build
+API_BASE_URL=https://api.production.com docker compose up -d
 ```
 
 ### Hot Reload Not Working in Development
@@ -299,12 +205,12 @@ VITE_API_BASE_URL=https://api.production.com docker compose up -d --build
 **Solution**:
 ```bash
 # Find what's using the port
-lsof -i :5173  # for dev
+lsof -i :3001  # for dev
 lsof -i :8080  # for prod
 
 # Or use a different port
 PORT=3001 docker compose up -d
-DEV_PORT=3000 docker compose --profile dev up frontend-dev
+DEV_PORT=3002 docker compose --profile dev up frontend-dev
 ```
 
 ---
@@ -314,23 +220,15 @@ DEV_PORT=3000 docker compose --profile dev up frontend-dev
 ```
 ┌─────────────────┐     ┌─────────────────┐
 │                 │     │                 │
-│   Browser       │────▶│   Nginx         │
-│                 │     │   (Port 80)     │
+│   Browser       │────▶│   Next.js       │
+│                 │     │   (Port 3000)   │
 └─────────────────┘     └────────┬────────┘
                                  │
                                  ▼
                         ┌─────────────────┐
                         │                 │
-                        │  Static Files   │
-                        │  (React SPA)    │
-                        │                 │
-                        └────────┬────────┘
-                                 │
-                                 ▼
-                        ┌─────────────────┐
-                        │                 │
                         │  Backend API    │
-                        │  (Port 3000)    │
+                        │  (Port 5000)    │
                         │                 │
                         └─────────────────┘
 ```
@@ -343,7 +241,6 @@ DEV_PORT=3000 docker compose --profile dev up frontend-dev
 |------|---------|
 | `Dockerfile` | Multi-stage build for production container |
 | `docker-compose.yml` | Container orchestration for dev and prod |
-| `nginx.conf` | Nginx configuration for SPA serving |
 | `.dockerignore` | Files excluded from Docker build |
 | `.env.example` | Environment variable template |
 
@@ -355,8 +252,8 @@ If you cannot use Docker, you can run the application directly with Node.js.
 
 ### Prerequisites
 
-- **Node.js**: v18 or higher
-- **npm**: v9 or higher
+- **Node.js**: v20 or higher
+- **npm**: v10 or higher
 
 ### Development
 
@@ -365,48 +262,33 @@ If you cannot use Docker, you can run the application directly with Node.js.
 npm install
 
 # Configure environment
-cp .env.example .env
-# Edit .env to set VITE_API_BASE_URL
+cp .env.example .env.local
+# Edit .env.local to set API_BASE_URL
 
 # Start development server
 npm run dev
 ```
 
-The app runs at `http://localhost:5173`
+The app runs at `http://localhost:3000`
 
 ### Production Build
 
 ```bash
-# Set API URL and build
-VITE_API_BASE_URL=https://api.production.com npm run build
+# Build the application
+npm run build
 
-# Preview the build locally
-npm run preview
+# Start the production server
+API_BASE_URL=https://api.production.com npm run start
 ```
 
-The built files will be in the `dist` directory, ready for deployment to any static hosting provider.
+### Deploy to Vercel
 
-### Deploy to Nginx (Manual)
+```bash
+npx vercel --prod
+```
 
-1. Build the app:
-   ```bash
-   npm run build
-   ```
+Set the `API_BASE_URL` environment variable in your Vercel project settings.
 
-2. Copy `dist/` contents to your web server:
-   ```bash
-   scp -r dist/* user@server:/var/www/html/
-   ```
+### Deploy to Other Platforms
 
-3. Configure Nginx (use provided `nginx.conf` as reference):
-   ```nginx
-   server {
-       listen 80;
-       root /var/www/html;
-       index index.html;
-
-       location / {
-           try_files $uri $uri/ /index.html;
-       }
-   }
-   ```
+Next.js standalone output can be deployed to any Node.js hosting platform. The build output is in `.next/standalone/`.
