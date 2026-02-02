@@ -4,7 +4,7 @@
 
 - **Docker** (v20 or higher) - [Install Docker](https://docs.docker.com/get-docker/)
 - **Docker Compose** (included with Docker Desktop)
-- Backend server running on `http://localhost:3000` (or configure different URL)
+- Backend server running on `http://localhost:5000` (or configure different URL)
 
 ## Installation & Setup
 
@@ -19,14 +19,14 @@
    ```
 
 3. **Open browser**:
-   Navigate to `http://localhost:5173`
+   Navigate to `http://localhost:3001`
 
 ### Custom Backend URL
 
 If your backend is running on a different URL:
 
 ```bash
-VITE_API_BASE_URL=https://api.example.com docker compose --profile dev up frontend-dev
+API_BASE_URL=https://api.example.com docker compose --profile dev up frontend-dev
 ```
 
 ### Running in Production Mode
@@ -91,10 +91,10 @@ docker compose up -d
 
 The app will be available at `http://localhost:8080`.
 
-To build with a custom API URL:
+To run with a custom API URL:
 
 ```bash
-VITE_API_BASE_URL=https://api.production.com docker compose up -d --build
+API_BASE_URL=https://api.production.com docker compose up -d --build
 ```
 
 ## Docker Commands Reference
@@ -112,15 +112,15 @@ VITE_API_BASE_URL=https://api.production.com docker compose up -d --build
 ### Docker Container Won't Start
 - Run `docker compose logs` to see error messages
 - Ensure Docker daemon is running
-- Check port 5173 (dev) or 8080 (prod) isn't in use
+- Check port 3001 (dev) or 8080 (prod) isn't in use
 
 ### CORS Errors
 - Ensure backend has CORS enabled (it should by default)
-- Check that `VITE_API_BASE_URL` points to correct backend
+- Check that `API_BASE_URL` points to correct backend
 
 ### Connection Refused
 - Verify backend server is running
-- Check backend is listening on the correct port (3000)
+- Check backend is listening on the correct port (5000)
 - If backend is also in Docker, ensure network connectivity
 
 ### 404 Not Found
