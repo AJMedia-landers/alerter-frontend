@@ -356,7 +356,15 @@ export default function AlertsPage() {
                         name="platform"
                         value={option.value}
                         checked={formData.platform === option.value}
-                        onChange={(e) => setFormData({ ...formData, platform: e.target.value as Platform })}
+                        onChange={(e) => {
+                          const newPlatform = e.target.value as Platform;
+                          // Reset condition_type if switching to outbrain and weekly_cpa_increase is selected
+                          const newConditionType =
+                            newPlatform === "outbrain" && formData.condition_type === "weekly_cpa_increase"
+                              ? "cpa_threshold"
+                              : formData.condition_type;
+                          setFormData({ ...formData, platform: newPlatform, condition_type: newConditionType });
+                        }}
                       />
                       <div className="radio-content">
                         <div>
@@ -438,7 +446,11 @@ export default function AlertsPage() {
                   Condition Type <span className="required">*</span>
                 </label>
                 <div className="radio-group">
-                  {CONDITION_OPTIONS.map((option) => (
+                  {CONDITION_OPTIONS.filter(
+                    (option) =>
+                      // Hide weekly_cpa_increase for Outbrain (not supported)
+                      !(formData.platform === "outbrain" && option.value === "weekly_cpa_increase")
+                  ).map((option) => (
                     <label
                       key={option.value}
                       className={`radio-card ${formData.condition_type === option.value ? "selected" : ""}`}
