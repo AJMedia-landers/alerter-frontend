@@ -4,10 +4,10 @@
  */
 
 /**
- * Get the validated API base URL from environment variables
- * This function validates and returns the API_BASE_URL at runtime
+ * Validate and return the API base URL from environment variables
+ * This function validates the API_BASE_URL at runtime
  */
-export function getApiBaseUrl(): string {
+function validateApiBaseUrl(): string {
   const apiUrl = process.env.API_BASE_URL;
   
   if (!apiUrl) {
@@ -28,4 +28,18 @@ export function getApiBaseUrl(): string {
   }
   
   return apiUrl;
+}
+
+// Cache the validated URL to avoid redundant validation on every request
+let cachedApiBaseUrl: string | null = null;
+
+/**
+ * Get the validated API base URL
+ * The URL is validated once and cached for subsequent calls
+ */
+export function getApiBaseUrl(): string {
+  if (cachedApiBaseUrl === null) {
+    cachedApiBaseUrl = validateApiBaseUrl();
+  }
+  return cachedApiBaseUrl;
 }
