@@ -1111,6 +1111,30 @@ body {
   color: #95a5a6;
 }
 
+.badge.platform {
+  font-size: 0.7rem;
+}
+
+.badge.platform.taboola {
+  background: #1a73e8;
+  color: white;
+}
+
+.badge.platform.outbrain {
+  background: #f26522;
+  color: white;
+}
+
+.platform-badge.taboola {
+  color: #1a73e8;
+  font-weight: 600;
+}
+
+.platform-badge.outbrain {
+  color: #f26522;
+  font-weight: 600;
+}
+
 .rule-body {
   display: flex;
   flex-direction: column;

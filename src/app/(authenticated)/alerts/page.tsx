@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { AlerterRule, RuleScope, ConditionType } from "@/types/alerter";
+import type { AlerterRule, RuleScope, ConditionType, Platform } from "@/types/alerter";
 
 const SCOPE_OPTIONS: { value: RuleScope; label: string; description: string; icon: string }[] = [
   {
@@ -44,6 +44,23 @@ const CONDITION_OPTIONS: {
   },
 ];
 
+const PLATFORM_OPTIONS: {
+  value: Platform;
+  label: string;
+  description: string;
+}[] = [
+  {
+    value: "taboola",
+    label: "Taboola",
+    description: "Monitor Taboola campaigns and accounts",
+  },
+  {
+    value: "outbrain",
+    label: "Outbrain",
+    description: "Monitor Outbrain campaigns and accounts",
+  },
+];
+
 export default function AlertsPage() {
   const [rules, setRules] = useState<AlerterRule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,9 +72,11 @@ export default function AlertsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterScope, setFilterScope] = useState<RuleScope | "all">("all");
   const [filterCondition, setFilterCondition] = useState<ConditionType | "all">("all");
+  const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
 
   const [formData, setFormData] = useState<Omit<AlerterRule, "id" | "created_at" | "updated_at">>({
     name: "",
+    platform: "taboola",
     scope: "account",
     account_name: "",
     timeframe_hours: 2,
@@ -204,6 +223,7 @@ export default function AlertsPage() {
     setEditingRule(rule);
     setFormData({
       name: rule.name,
+      platform: rule.platform ?? "taboola",
       scope: rule.scope,
       account_name: rule.account_name,
       timeframe_hours: rule.timeframe_hours,
@@ -217,6 +237,7 @@ export default function AlertsPage() {
   const resetForm = () => {
     setFormData({
       name: "",
+      platform: "taboola",
       scope: "account",
       account_name: "",
       timeframe_hours: 2,
@@ -241,8 +262,9 @@ export default function AlertsPage() {
 
     const matchesScope = filterScope === "all" || rule.scope === filterScope;
     const matchesCondition = filterCondition === "all" || rule.condition_type === filterCondition;
+    const matchesPlatform = filterPlatform === "all" || (rule.platform ?? "taboola") === filterPlatform;
 
-    return matchesSearch && matchesScope && matchesCondition;
+    return matchesSearch && matchesScope && matchesCondition && matchesPlatform;
   });
 
   if (loading) {
@@ -317,6 +339,34 @@ export default function AlertsPage() {
                   required
                 />
                 <small className="form-help">A descriptive name to identify this rule</small>
+              </div>
+
+              <div className="form-group full-width">
+                <label>
+                  Platform <span className="required">*</span>
+                </label>
+                <div className="radio-group">
+                  {PLATFORM_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      className={`radio-card ${formData.platform === option.value ? "selected" : ""}`}
+                    >
+                      <input
+                        type="radio"
+                        name="platform"
+                        value={option.value}
+                        checked={formData.platform === option.value}
+                        onChange={(e) => setFormData({ ...formData, platform: e.target.value as Platform })}
+                      />
+                      <div className="radio-content">
+                        <div>
+                          <strong>{option.label}</strong>
+                          <p>{option.description}</p>
+                        </div>
+                      </div>
+                    </label>
+                  ))}
+                </div>
               </div>
 
               <div className="form-group">
@@ -484,6 +534,12 @@ export default function AlertsPage() {
         </div>
 
         <div className="filter-group">
+          <select value={filterPlatform} onChange={(e) => setFilterPlatform(e.target.value as Platform | "all")}>
+            <option value="all">All Platforms</option>
+            <option value="taboola">Taboola</option>
+            <option value="outbrain">Outbrain</option>
+          </select>
+
           <select value={filterScope} onChange={(e) => setFilterScope(e.target.value as RuleScope | "all")}>
             <option value="all">All Scopes</option>
             <option value="account">Account Level</option>
@@ -529,6 +585,9 @@ export default function AlertsPage() {
                 <div className="rule-header">
                   <h3>{rule.name}</h3>
                   <div className="rule-badges">
+                    <span className={`badge platform ${rule.platform ?? "taboola"}`}>
+                      {(rule.platform ?? "taboola").charAt(0).toUpperCase() + (rule.platform ?? "taboola").slice(1)}
+                    </span>
                     <span className={`badge ${rule.is_active ? "active" : "inactive"}`}>
                       {rule.is_active ? "Active" : "Inactive"}
                     </span>
@@ -536,6 +595,13 @@ export default function AlertsPage() {
                 </div>
 
                 <div className="rule-body">
+                  <div className="rule-detail">
+                    <span className="detail-label">Platform:</span>
+                    <span className={`detail-value platform-badge ${rule.platform ?? "taboola"}`}>
+                      {(rule.platform ?? "taboola").charAt(0).toUpperCase() + (rule.platform ?? "taboola").slice(1)}
+                    </span>
+                  </div>
+
                   <div className="rule-detail">
                     <span className="detail-label">Account:</span>
                     <span className="detail-value">{rule.account_name}</span>
