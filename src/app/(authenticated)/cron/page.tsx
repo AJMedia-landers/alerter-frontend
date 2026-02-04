@@ -2,191 +2,114 @@
 
 import { useState } from "react";
 
-interface SyncResponse {
+interface AlertResult {
+  endpoint: string;
   success: boolean;
   message: string;
   data?: Record<string, unknown>;
-  syncStatus?: string;
   errors?: string[];
 }
 
-interface CronEndpoint {
-  title: string;
-  description: string;
-  endpoint: string;
-  params?: { name: string; defaultValue: number; min: number; max: number; label: string }[];
-}
-
-const taboolaEndpoints: CronEndpoint[] = [
-  {
-    title: "[Taboola] Realtime Threshold Alerts",
-    description: "Run rule-based threshold alerts (uses alerter rules - no hours parameter needed)",
-    endpoint: "taboola/sync-realtime-reports-threshold",
-  },
-  {
-    title: "[Taboola] Realtime Comparison",
-    description: "Compare current X hours vs previous X hours",
-    endpoint: "taboola/sync-realtime-reports-comparison",
-    params: [{ name: "hours", defaultValue: 2, min: 1, max: 24, label: "Hours" }],
-  },
-  {
-    title: "[Taboola] Weekly Comparison",
-    description: "Run rule-based weekly CPA comparison (uses alerter rules - no hours parameter needed)",
-    endpoint: "taboola/sync-weekly-comparison",
-  },
-  {
-    title: "[Taboola] Realtime vs Historical",
-    description: "Compare realtime X hours vs Y days historical average",
-    endpoint: "taboola/sync-realtime-vs-historical",
-    params: [
-      { name: "hours", defaultValue: 2, min: 1, max: 24, label: "Hours (Realtime)" },
-      { name: "days", defaultValue: 2, min: 1, max: 30, label: "Days (Historical)" },
-    ],
-  },
+const alertEndpoints = [
+  { name: "Taboola", endpoint: "taboola/sync-realtime-reports-threshold" },
+  { name: "Outbrain", endpoint: "outbrain/sync-realtime-reports-threshold" },
 ];
 
-const outbrainEndpoints: CronEndpoint[] = [
-  {
-    title: "[Outbrain] Realtime Threshold Alerts",
-    description: "Run rule-based threshold alerts for Outbrain marketers (uses alerter rules)",
-    endpoint: "outbrain/sync-realtime-reports-threshold",
-  },
-];
+export default function ManualTriggerAlertsPage() {
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<AlertResult[]>([]);
 
-export default function CronPage() {
-  const [loading, setLoading] = useState<string | null>(null);
-  const [response, setResponse] = useState<SyncResponse | null>(null);
-  const [paramValues, setParamValues] = useState<Record<string, Record<string, number>>>({});
+  const triggerAllAlerts = async () => {
+    setLoading(true);
+    setResults([]);
 
-  const handleSync = async (endpoint: string, params?: Record<string, number>) => {
-    setLoading(endpoint);
-    setResponse(null);
+    const allResults: AlertResult[] = [];
 
-    try {
-      const queryParams = params
-        ? new URLSearchParams(
-            Object.entries(params).reduce((acc, [key, value]) => {
-              acc[key] = String(value);
-              return acc;
-            }, {} as Record<string, string>)
-          )
-        : "";
-
-      const url = `/api/cron/${endpoint}${queryParams ? `?${queryParams}` : ""}`;
-
-      const res = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      const data = await res.json();
-      setResponse(data);
-    } catch {
-      setResponse({
-        success: false,
-        message: "Request failed",
-      });
-    } finally {
-      setLoading(null);
+    for (const { name, endpoint } of alertEndpoints) {
+      try {
+        const res = await fetch(`/api/cron/${endpoint}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        const data = await res.json();
+        allResults.push({
+          endpoint: name,
+          success: data.success,
+          message: data.message,
+          data: data.data,
+          errors: data.errors,
+        });
+      } catch {
+        allResults.push({
+          endpoint: name,
+          success: false,
+          message: "Request failed",
+        });
+      }
     }
+
+    setResults(allResults);
+    setLoading(false);
   };
 
-  const getParamValue = (endpoint: string, paramName: string, defaultValue: number) => {
-    return paramValues[endpoint]?.[paramName] ?? defaultValue;
-  };
-
-  const setParamValue = (endpoint: string, paramName: string, value: number) => {
-    setParamValues((prev) => ({
-      ...prev,
-      [endpoint]: {
-        ...prev[endpoint],
-        [paramName]: value,
-      },
-    }));
-  };
-
-  const renderEndpointCard = (item: CronEndpoint) => (
-    <div key={item.endpoint} className="form-card">
-      <h3>{item.title}</h3>
-      <p className="description">{item.description}</p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          const params = item.params?.reduce((acc, param) => {
-            acc[param.name] = getParamValue(item.endpoint, param.name, param.defaultValue);
-            return acc;
-          }, {} as Record<string, number>);
-          handleSync(item.endpoint, params);
-        }}
-      >
-        {item.params?.map((param) => (
-          <div key={param.name} className="form-group">
-            <label htmlFor={`${item.endpoint}-${param.name}`}>{param.label}:</label>
-            <input
-              id={`${item.endpoint}-${param.name}`}
-              type="number"
-              min={param.min}
-              max={param.max}
-              value={getParamValue(item.endpoint, param.name, param.defaultValue)}
-              onChange={(e) =>
-                setParamValue(item.endpoint, param.name, Number(e.target.value))
-              }
-            />
-          </div>
-        ))}
-        <button type="submit" disabled={loading === item.endpoint}>
-          {loading === item.endpoint ? "Syncing..." : "Sync"}
-        </button>
-      </form>
-    </div>
-  );
+  const allSuccess = results.length > 0 && results.every((r) => r.success);
+  const hasErrors = results.some((r) => !r.success);
 
   return (
-    <div className="cron-sync-container">
-      <section className="sync-section">
-        <h2>Taboola</h2>
-        <div className="sync-grid">
-          {taboolaEndpoints.map(renderEndpointCard)}
-        </div>
-      </section>
+    <div className="manual-trigger-container">
+      <div className="trigger-header">
+        <h1>Manual Trigger Alerts</h1>
+        <p className="trigger-description">
+          Run all rule-based alert checks across all platforms (Taboola &amp; Outbrain)
+        </p>
+        <p>Note: these checks are also automatically run every hour</p>
+      </div>
 
-      <section className="sync-section">
-        <h2>Outbrain</h2>
-        <div className="sync-grid">
-          {outbrainEndpoints.map(renderEndpointCard)}
-        </div>
-      </section>
+      <div className="trigger-action">
+        <button
+          className="trigger-all-btn"
+          onClick={triggerAllAlerts}
+          disabled={loading}
+        >
+          {loading ? "Running All Checks..." : "Run All Alert Checks"}
+        </button>
+      </div>
 
-      {response && (
-        <div className={`response-card ${response.success ? "success" : "error"}`}>
-          <h3>Response</h3>
-          <div className="response-status">
-            <strong>Status:</strong> {response.success ? "Success" : "Failed"}
-            {response.syncStatus && <span> ({response.syncStatus})</span>}
+      {results.length > 0 && (
+        <div className={`results-container ${allSuccess ? "all-success" : hasErrors ? "has-errors" : ""}`}>
+          <h2>Results</h2>
+          <div className="results-grid">
+            {results.map((result) => (
+              <div
+                key={result.endpoint}
+                className={`result-card ${result.success ? "success" : "error"}`}
+              >
+                <h3>{result.endpoint}</h3>
+                <div className="result-status">
+                  {result.success ? "Success" : "Failed"}
+                </div>
+                <p className="result-message">{result.message}</p>
+
+                {result.data && (
+                  <details className="result-data">
+                    <summary>Response Data</summary>
+                    <pre>{JSON.stringify(result.data, null, 2)}</pre>
+                  </details>
+                )}
+
+                {result.errors && result.errors.length > 0 && (
+                  <details className="result-errors">
+                    <summary>Errors ({result.errors.length})</summary>
+                    <ul>
+                      {result.errors.map((error, index) => (
+                        <li key={index}>{error}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            ))}
           </div>
-          <div className="response-message">
-            <strong>Message:</strong> {response.message}
-          </div>
-
-          {response.data && (
-            <details className="response-data">
-              <summary>Response Data</summary>
-              <pre>{JSON.stringify(response.data, null, 2)}</pre>
-            </details>
-          )}
-
-          {response.errors && response.errors.length > 0 && (
-            <details className="response-errors">
-              <summary>Errors ({response.errors.length})</summary>
-              <ul>
-                {response.errors.map((error, index) => (
-                  <li key={index}>{error}</li>
-                ))}
-              </ul>
-            </details>
-          )}
         </div>
       )}
     </div>

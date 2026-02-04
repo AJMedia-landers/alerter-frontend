@@ -26,7 +26,7 @@ export default function AuthenticatedLayout({
               href="/cron"
               className={`nav-tab ${pathname === "/cron" ? "active" : ""}`}
             >
-              Cron Jobs
+              Manual Trigger Alerts
             </Link>
             <Link
               href="/alerts"
