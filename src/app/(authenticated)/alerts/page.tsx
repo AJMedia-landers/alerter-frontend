@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { AlerterRule, RuleScope, ConditionType, Platform, Severity } from "@/types/alerter";
 
 const SCOPE_OPTIONS: { value: RuleScope; label: string; description: string; icon: string }[] = [
@@ -88,6 +88,7 @@ const SEVERITY_OPTIONS: {
 ];
 
 export default function AlertsPage() {
+  const formRef = useRef<HTMLDivElement>(null);
   const [rules, setRules] = useState<AlerterRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -101,14 +102,20 @@ export default function AlertsPage() {
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
   const [filterSeverity, setFilterSeverity] = useState<Severity | "all">("all");
 
-  const [formData, setFormData] = useState<Omit<AlerterRule, "id" | "created_at" | "updated_at">>({
+  const [formData, setFormData] = useState<
+    Omit<AlerterRule, "id" | "created_at" | "updated_at" | "timeframe_hours" | "threshold" | "min_spend"> & {
+      timeframe_hours: number | "";
+      threshold: number | "";
+      min_spend: number | "" | null;
+    }
+  >({
     name: "",
     platform: "taboola",
     scope: "account",
     account_name: "",
     timeframe_hours: 2,
     condition_type: "cpa_threshold",
-    threshold: 0,
+    threshold: "",
     severity: 2,
     min_spend: null,
     is_active: true,
@@ -151,28 +158,35 @@ export default function AlertsPage() {
       setError("Account name is required");
       return;
     }
-    if (formData.threshold <= 0) {
+    if (formData.threshold === "" || formData.threshold <= 0) {
       setError("Threshold must be greater than 0");
       return;
     }
-    if (formData.timeframe_hours <= 0) {
+    if (formData.timeframe_hours === "" || formData.timeframe_hours <= 0) {
       setError("Timeframe must be greater than 0 hours");
       return;
     }
 
     try {
+      const submitData = {
+        ...formData,
+        timeframe_hours: Number(formData.timeframe_hours),
+        threshold: Number(formData.threshold),
+        min_spend: formData.min_spend === "" || formData.min_spend === null ? null : Number(formData.min_spend),
+      };
+
       let response;
       if (editingRule && editingRule.id) {
         response = await fetch(`/api/alerter-rules/${editingRule.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(submitData),
         });
       } else {
         response = await fetch("/api/alerter-rules", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(submitData),
         });
       }
 
@@ -263,6 +277,9 @@ export default function AlertsPage() {
       is_active: rule.is_active ?? true,
     });
     setShowCreateForm(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
   };
 
   const resetForm = () => {
@@ -273,7 +290,7 @@ export default function AlertsPage() {
       account_name: "",
       timeframe_hours: 2,
       condition_type: "cpa_threshold",
-      threshold: 0,
+      threshold: "",
       severity: 2,
       min_spend: null,
       is_active: true,
@@ -350,7 +367,7 @@ export default function AlertsPage() {
       )}
 
       {showCreateForm && (
-        <div className="create-form-card">
+        <div className="create-form-card" ref={formRef}>
           <div className="form-header">
             <h2>{editingRule ? `Edit Rule: ${editingRule.name}` : "Create New Alerter Rule"}</h2>
             <button className="close-icon" onClick={cancelEdit}>
@@ -439,7 +456,7 @@ export default function AlertsPage() {
                   value={formData.timeframe_hours}
                   onChange={(e) => {
                     const value = e.target.value === "" ? "" : Math.round(Number(e.target.value));
-                    setFormData({ ...formData, timeframe_hours: value === "" ? 2 : value });
+                    setFormData({ ...formData, timeframe_hours: value });
                   }}
                   required
                 />
@@ -527,9 +544,9 @@ export default function AlertsPage() {
                     min="0"
                     step={formData.condition_type === "weekly_cpa_increase" ? "1" : "0.01"}
                     placeholder={formData.condition_type === "weekly_cpa_increase" ? "e.g., 20" : "e.g., 65.00"}
-                    value={formData.threshold || ""}
+                    value={formData.threshold}
                     onChange={(e) => {
-                      const value = e.target.value === "" ? 0 : parseFloat(e.target.value);
+                      const value = e.target.value === "" ? "" : parseFloat(e.target.value);
                       setFormData({ ...formData, threshold: value });
                     }}
                     required
@@ -557,7 +574,7 @@ export default function AlertsPage() {
                       placeholder="e.g., 50.00"
                       value={formData.min_spend ?? ""}
                       onChange={(e) => {
-                        const value = e.target.value === "" ? null : parseFloat(e.target.value);
+                        const value = e.target.value === "" ? "" : parseFloat(e.target.value);
                         setFormData({ ...formData, min_spend: value });
                       }}
                     />
