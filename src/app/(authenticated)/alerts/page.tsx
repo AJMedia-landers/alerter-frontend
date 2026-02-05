@@ -3,6 +3,20 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import type { AlerterRule, RuleScope, ConditionType, Platform, Severity } from "@/types/alerter";
 
+// Debug/Cron types and constants
+interface AlertResult {
+  endpoint: string;
+  success: boolean;
+  message: string;
+  data?: Record<string, unknown>;
+  errors?: string[];
+}
+
+const alertEndpoints = [
+  { name: "Taboola", endpoint: "taboola/sync-realtime-reports-threshold" },
+  { name: "Outbrain", endpoint: "outbrain/sync-realtime-reports-threshold" },
+];
+
 const SCOPE_OPTIONS: { value: RuleScope; label: string; description: string; icon: string }[] = [
   {
     value: "account",
@@ -101,6 +115,10 @@ export default function AlertsPage() {
   const [filterCondition, setFilterCondition] = useState<ConditionType | "all">("all");
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
   const [filterSeverity, setFilterSeverity] = useState<Severity | "all">("all");
+
+  // Debug/Manual trigger state
+  const [debugLoading, setDebugLoading] = useState(false);
+  const [debugResults, setDebugResults] = useState<AlertResult[]>([]);
 
   const [formData, setFormData] = useState<
     Omit<AlerterRule, "id" | "created_at" | "updated_at" | "timeframe_hours" | "threshold" | "min_spend"> & {
@@ -304,6 +322,65 @@ export default function AlertsPage() {
     setError(null);
   };
 
+  const duplicateRule = (rule: AlerterRule) => {
+    setEditingRule(null);
+    setFormData({
+      name: `${rule.name} (Copy)`,
+      platform: rule.platform ?? "taboola",
+      scope: rule.scope,
+      account_name: rule.account_name,
+      timeframe_hours: rule.timeframe_hours,
+      condition_type: rule.condition_type,
+      threshold: rule.threshold,
+      severity: rule.severity ?? 2,
+      min_spend: rule.min_spend ?? null,
+      is_active: true,
+    });
+    setShowCreateForm(true);
+    setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  };
+
+  const triggerAllAlerts = async () => {
+    setDebugLoading(true);
+    setDebugResults([]);
+
+    const allResults: AlertResult[] = [];
+
+    for (const { name, endpoint } of alertEndpoints) {
+      try {
+        const res = await fetch(`/api/cron/${endpoint}`, {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+        });
+        const data = await res.json();
+        allResults.push({
+          endpoint: name,
+          success: data.success,
+          message: data.message,
+          data: data.data,
+          errors: data.errors,
+        });
+      } catch {
+        allResults.push({
+          endpoint: name,
+          success: false,
+          message: "Request failed",
+        });
+      }
+    }
+
+    setDebugResults(allResults);
+    setDebugLoading(false);
+  };
+
+  const getAvailableConditions = (platform: Platform) => {
+    return CONDITION_OPTIONS.filter(
+      (option) => !(platform === "outbrain" && option.value === "weekly_cpa_increase")
+    );
+  };
+
   const filteredRules = rules.filter((rule) => {
     const matchesSearch =
       searchQuery === "" ||
@@ -346,6 +423,24 @@ export default function AlertsPage() {
         >
           + Create New Rule
         </button>
+      </div>
+
+      <div className="debug-section">
+        <div className="debug-row">
+          <span className="debug-label">Debug: Manual trigger (runs automatically every hour)</span>
+          <button
+            className="btn btn-secondary btn-sm"
+            onClick={triggerAllAlerts}
+            disabled={debugLoading}
+          >
+            {debugLoading ? "Running..." : "Run Now"}
+          </button>
+          {debugResults.length > 0 && (
+            <span className={`debug-status-inline ${debugResults.every((r) => r.success) ? "success" : "error"}`}>
+              {debugResults.every((r) => r.success) ? "Alerter ran successfully!" : "Alerter failed to run"}
+            </span>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -409,11 +504,14 @@ export default function AlertsPage() {
                         checked={formData.platform === option.value}
                         onChange={(e) => {
                           const newPlatform = e.target.value as Platform;
-                          // Reset condition_type if switching to outbrain and weekly_cpa_increase is selected
-                          const newConditionType =
-                            newPlatform === "outbrain" && formData.condition_type === "weekly_cpa_increase"
-                              ? "cpa_threshold"
-                              : formData.condition_type;
+                          const availableConditions = getAvailableConditions(newPlatform);
+                          // Reset to first available condition if current one is not available
+                          const isCurrentConditionAvailable = availableConditions.some(
+                            (opt) => opt.value === formData.condition_type
+                          );
+                          const newConditionType = isCurrentConditionAvailable
+                            ? formData.condition_type
+                            : availableConditions[0].value;
                           setFormData({ ...formData, platform: newPlatform, condition_type: newConditionType });
                         }}
                       />
@@ -791,6 +889,9 @@ export default function AlertsPage() {
                       title={rule.is_active ? "Deactivate" : "Activate"}
                     >
                       {rule.is_active ? "Pause" : "Play"}
+                    </button>
+                    <button className="btn btn-sm btn-secondary" onClick={() => duplicateRule(rule)} title="Duplicate rule">
+                      Duplicate
                     </button>
                     <button className="btn btn-sm btn-secondary" onClick={() => startEdit(rule)}>
                       Edit
