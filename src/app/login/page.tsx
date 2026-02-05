@@ -35,7 +35,7 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (data.success) {
-        router.push("/cron");
+        router.push("/alerts");
         router.refresh();
       } else {
         setError(data.message || "Login failed");
@@ -73,7 +73,7 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (data.success) {
-        router.push("/cron");
+        router.push("/alerts");
         router.refresh();
       } else {
         setError(data.message || "Signup failed");

@@ -23,12 +23,6 @@ export default function AuthenticatedLayout({
         <div className="nav-inner">
           <div className="nav-tabs">
             <Link
-              href="/cron"
-              className={`nav-tab ${pathname === "/cron" ? "active" : ""}`}
-            >
-              Manual Trigger Alerts
-            </Link>
-            <Link
               href="/alerts"
               className={`nav-tab ${pathname === "/alerts" ? "active" : ""}`}
             >
