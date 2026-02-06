@@ -75,6 +75,23 @@ const PLATFORM_OPTIONS: {
   },
 ];
 
+const TIMEZONE_OPTIONS = [
+  { value: "America/New_York", label: "Eastern Time (ET) - New York" },
+  { value: "America/Chicago", label: "Central Time (CT) - Chicago" },
+  { value: "America/Denver", label: "Mountain Time (MT) - Denver" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT) - Los Angeles" },
+  { value: "Europe/London", label: "GMT/BST - London" },
+  { value: "Europe/Paris", label: "CET/CEST - Paris" },
+  { value: "Europe/Berlin", label: "CET/CEST - Berlin" },
+  { value: "Asia/Jerusalem", label: "IST/IDT - Jerusalem" },
+  { value: "Asia/Tokyo", label: "JST - Tokyo" },
+  { value: "Asia/Shanghai", label: "CST - Shanghai" },
+  { value: "Asia/Kolkata", label: "IST - Kolkata" },
+  { value: "Australia/Sydney", label: "AEST/AEDT - Sydney" },
+  { value: "Pacific/Auckland", label: "NZST/NZDT - Auckland" },
+  { value: "UTC", label: "UTC" },
+];
+
 const SEVERITY_OPTIONS: {
   value: Severity;
   label: string;
@@ -135,6 +152,7 @@ export default function AlertsPage() {
     condition_type: "cpa_threshold",
     threshold: "",
     severity: 2,
+    timezone: null,
     min_spend: null,
     is_active: true,
   });
@@ -184,12 +202,17 @@ export default function AlertsPage() {
       setError("Timeframe must be greater than 0 hours");
       return;
     }
+    if (formData.platform === "outbrain" && !formData.timezone) {
+      setError("Timezone is required for Outbrain rules");
+      return;
+    }
 
     try {
       const submitData = {
         ...formData,
         timeframe_hours: Number(formData.timeframe_hours),
         threshold: Number(formData.threshold),
+        timezone: formData.platform === "outbrain" ? formData.timezone : null,
         min_spend: formData.min_spend === "" || formData.min_spend === null ? null : Number(formData.min_spend),
       };
 
@@ -291,6 +314,7 @@ export default function AlertsPage() {
       condition_type: rule.condition_type,
       threshold: rule.threshold,
       severity: rule.severity ?? 2,
+      timezone: rule.timezone ?? null,
       min_spend: rule.min_spend ?? null,
       is_active: rule.is_active ?? true,
     });
@@ -310,6 +334,7 @@ export default function AlertsPage() {
       condition_type: "cpa_threshold",
       threshold: "",
       severity: 2,
+      timezone: null,
       min_spend: null,
       is_active: true,
     });
@@ -333,6 +358,7 @@ export default function AlertsPage() {
       condition_type: rule.condition_type,
       threshold: rule.threshold,
       severity: rule.severity ?? 2,
+      timezone: rule.timezone ?? null,
       min_spend: rule.min_spend ?? null,
       is_active: true,
     });
@@ -560,6 +586,28 @@ export default function AlertsPage() {
                 />
                 <small className="form-help">Time window for checking metrics (whole hours only)</small>
               </div>
+
+              {formData.platform === "outbrain" && (
+                <div className="form-group">
+                  <label htmlFor="timezone">
+                    Timezone <span className="required">*</span>
+                  </label>
+                  <select
+                    id="timezone"
+                    value={formData.timezone ?? ""}
+                    onChange={(e) => setFormData({ ...formData, timezone: e.target.value || null })}
+                    required
+                  >
+                    <option value="">Select a timezone...</option>
+                    {TIMEZONE_OPTIONS.map((tz) => (
+                      <option key={tz.value} value={tz.value}>
+                        {tz.label}
+                      </option>
+                    ))}
+                  </select>
+                  <small className="form-help">Timezone used for alert time display in Slack notifications</small>
+                </div>
+              )}
 
               <div className="form-group full-width">
                 <label>
@@ -869,6 +917,13 @@ export default function AlertsPage() {
                       {Number(rule.timeframe_hours)} hour{Number(rule.timeframe_hours) !== 1 ? "s" : ""}
                     </span>
                   </div>
+
+                  {rule.timezone && (
+                    <div className="rule-detail">
+                      <span className="detail-label">Timezone:</span>
+                      <span className="detail-value">{rule.timezone}</span>
+                    </div>
+                  )}
 
                   <div className="rule-detail">
                     <span className="detail-label">Severity:</span>

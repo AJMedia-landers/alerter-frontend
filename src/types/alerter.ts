@@ -13,6 +13,7 @@ export interface AlerterRule {
   condition_type: ConditionType
   threshold: number
   severity: Severity
+  timezone?: string | null
   min_spend?: number | null
   is_active?: boolean
   created_at?: string
