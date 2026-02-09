@@ -154,6 +154,8 @@ export default function AlertsPage() {
     severity: 2,
     timezone: null,
     min_spend: null,
+    check_time_start: null,
+    check_time_end: null,
     is_active: true,
   });
 
@@ -214,6 +216,8 @@ export default function AlertsPage() {
         threshold: Number(formData.threshold),
         timezone: formData.platform === "outbrain" ? formData.timezone : null,
         min_spend: formData.min_spend === "" || formData.min_spend === null ? null : Number(formData.min_spend),
+        check_time_start: formData.check_time_start || null,
+        check_time_end: formData.check_time_end || null,
       };
 
       let response;
@@ -316,6 +320,8 @@ export default function AlertsPage() {
       severity: rule.severity ?? 2,
       timezone: rule.timezone ?? null,
       min_spend: rule.min_spend ?? null,
+      check_time_start: rule.check_time_start ?? null,
+      check_time_end: rule.check_time_end ?? null,
       is_active: rule.is_active ?? true,
     });
     setShowCreateForm(true);
@@ -336,6 +342,8 @@ export default function AlertsPage() {
       severity: 2,
       timezone: null,
       min_spend: null,
+      check_time_start: null,
+      check_time_end: null,
       is_active: true,
     });
   };
@@ -360,6 +368,8 @@ export default function AlertsPage() {
       severity: rule.severity ?? 2,
       timezone: rule.timezone ?? null,
       min_spend: rule.min_spend ?? null,
+      check_time_start: rule.check_time_start ?? null,
+      check_time_end: rule.check_time_end ?? null,
       is_active: true,
     });
     setShowCreateForm(true);
@@ -753,6 +763,34 @@ export default function AlertsPage() {
               </div>
 
               <div className="form-group">
+                <label>Check Time Range (optional)</label>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input
+                    id="check_time_start"
+                    type="text"
+                    placeholder="e.g., 09:00"
+                    pattern="^([01]\d|2[0-3]):[0-5]\d$"
+                    maxLength={5}
+                    value={formData.check_time_start ?? ""}
+                    onChange={(e) => setFormData({ ...formData, check_time_start: e.target.value || null })}
+                  />
+                  <span>to</span>
+                  <input
+                    id="check_time_end"
+                    type="text"
+                    placeholder="e.g., 17:00"
+                    pattern="^([01]\d|2[0-3]):[0-5]\d$"
+                    maxLength={5}
+                    value={formData.check_time_end ?? ""}
+                    onChange={(e) => setFormData({ ...formData, check_time_end: e.target.value || null })}
+                  />
+                </div>
+                <small className="form-help">
+                  Time range when this rule should be checked (leave empty to check on every cron run)
+                </small>
+              </div>
+
+              <div className="form-group">
                 <label htmlFor="is_active">Status</label>
                 <label className="toggle-switch">
                   <input
@@ -922,6 +960,13 @@ export default function AlertsPage() {
                     <div className="rule-detail">
                       <span className="detail-label">Timezone:</span>
                       <span className="detail-value">{rule.timezone}</span>
+                    </div>
+                  )}
+
+                  {rule.check_time_start && rule.check_time_end && (
+                    <div className="rule-detail">
+                      <span className="detail-label">Check Time:</span>
+                      <span className="detail-value">{rule.check_time_start} - {rule.check_time_end}</span>
                     </div>
                   )}
 
