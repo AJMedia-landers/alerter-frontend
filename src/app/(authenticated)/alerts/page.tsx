@@ -75,6 +75,23 @@ const PLATFORM_OPTIONS: {
   },
 ];
 
+const TIMEZONE_OPTIONS = [
+  { value: "America/New_York", label: "Eastern Time (ET) - New York" },
+  { value: "America/Chicago", label: "Central Time (CT) - Chicago" },
+  { value: "America/Denver", label: "Mountain Time (MT) - Denver" },
+  { value: "America/Los_Angeles", label: "Pacific Time (PT) - Los Angeles" },
+  { value: "Europe/London", label: "GMT/BST - London" },
+  { value: "Europe/Paris", label: "CET/CEST - Paris" },
+  { value: "Europe/Berlin", label: "CET/CEST - Berlin" },
+  { value: "Asia/Jerusalem", label: "IST/IDT - Jerusalem" },
+  { value: "Asia/Tokyo", label: "JST - Tokyo" },
+  { value: "Asia/Shanghai", label: "CST - Shanghai" },
+  { value: "Asia/Kolkata", label: "IST - Kolkata" },
+  { value: "Australia/Sydney", label: "AEST/AEDT - Sydney" },
+  { value: "Pacific/Auckland", label: "NZST/NZDT - Auckland" },
+  { value: "UTC", label: "UTC" },
+];
+
 const SEVERITY_OPTIONS: {
   value: Severity;
   label: string;
@@ -116,6 +133,9 @@ export default function AlertsPage() {
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
   const [filterSeverity, setFilterSeverity] = useState<Severity | "all">("all");
 
+  // Account names for dropdown
+  const [accounts, setAccounts] = useState<{ name: string; platform: string; timezone: string | null }[]>([]);
+
   // Debug/Manual trigger state
   const [debugLoading, setDebugLoading] = useState(false);
   const [debugResults, setDebugResults] = useState<AlertResult[]>([]);
@@ -135,7 +155,10 @@ export default function AlertsPage() {
     condition_type: "cpa_threshold",
     threshold: "",
     severity: 2,
+    timezone: null,
     min_spend: null,
+    check_time_start: null,
+    check_time_end: null,
     is_active: true,
   });
 
@@ -163,6 +186,21 @@ export default function AlertsPage() {
     loadRules();
   }, [loadRules]);
 
+  useEffect(() => {
+    const loadAccounts = async () => {
+      try {
+        const response = await fetch("/api/accounts");
+        const data = await response.json();
+        if (data.data) {
+          setAccounts(data.data);
+        }
+      } catch {
+        console.error("Failed to load accounts");
+      }
+    };
+    loadAccounts();
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -184,13 +222,20 @@ export default function AlertsPage() {
       setError("Timeframe must be greater than 0 hours");
       return;
     }
+    if (formData.platform === "outbrain" && !formData.timezone) {
+      setError("Timezone is required for Outbrain rules");
+      return;
+    }
 
     try {
       const submitData = {
         ...formData,
         timeframe_hours: Number(formData.timeframe_hours),
         threshold: Number(formData.threshold),
+        timezone: formData.timezone || null,
         min_spend: formData.min_spend === "" || formData.min_spend === null ? null : Number(formData.min_spend),
+        check_time_start: formData.check_time_start || null,
+        check_time_end: formData.check_time_end || null,
       };
 
       let response;
@@ -291,7 +336,10 @@ export default function AlertsPage() {
       condition_type: rule.condition_type,
       threshold: rule.threshold,
       severity: rule.severity ?? 2,
+      timezone: rule.timezone ?? null,
       min_spend: rule.min_spend ?? null,
+      check_time_start: rule.check_time_start ?? null,
+      check_time_end: rule.check_time_end ?? null,
       is_active: rule.is_active ?? true,
     });
     setShowCreateForm(true);
@@ -310,7 +358,10 @@ export default function AlertsPage() {
       condition_type: "cpa_threshold",
       threshold: "",
       severity: 2,
+      timezone: null,
       min_spend: null,
+      check_time_start: null,
+      check_time_end: null,
       is_active: true,
     });
   };
@@ -333,7 +384,10 @@ export default function AlertsPage() {
       condition_type: rule.condition_type,
       threshold: rule.threshold,
       severity: rule.severity ?? 2,
+      timezone: rule.timezone ?? null,
       min_spend: rule.min_spend ?? null,
+      check_time_start: rule.check_time_start ?? null,
+      check_time_end: rule.check_time_end ?? null,
       is_active: true,
     });
     setShowCreateForm(true);
@@ -512,7 +566,7 @@ export default function AlertsPage() {
                           const newConditionType = isCurrentConditionAvailable
                             ? formData.condition_type
                             : availableConditions[0].value;
-                          setFormData({ ...formData, platform: newPlatform, condition_type: newConditionType });
+                          setFormData({ ...formData, platform: newPlatform, condition_type: newConditionType, account_name: "", timezone: null });
                         }}
                       />
                       <div className="radio-content">
@@ -530,35 +584,90 @@ export default function AlertsPage() {
                 <label htmlFor="account_name">
                   Account Name <span className="required">*</span>
                 </label>
-                <input
+                <select
                   id="account_name"
-                  type="text"
                   value={formData.account_name}
-                  onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
-                  placeholder="e.g., readingglasses, ketomax"
-                  required
-                />
-                <small className="form-help">Account identifier (case-insensitive match)</small>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="timeframe_hours">
-                  Timeframe (hours) <span className="required">*</span>
-                </label>
-                <input
-                  id="timeframe_hours"
-                  type="number"
-                  min="1"
-                  step="1"
-                  placeholder="e.g., 2"
-                  value={formData.timeframe_hours}
                   onChange={(e) => {
-                    const value = e.target.value === "" ? "" : Math.round(Number(e.target.value));
-                    setFormData({ ...formData, timeframe_hours: value });
+                    const selectedName = e.target.value;
+                    const selectedAccount = accounts.find(
+                      (acc) => acc.name === selectedName && acc.platform === formData.platform
+                    );
+                    const updates: Partial<typeof formData> = { account_name: selectedName };
+                    if (formData.platform === "taboola" && selectedAccount?.timezone) {
+                      updates.timezone = selectedAccount.timezone;
+                    }
+                    setFormData({ ...formData, ...updates });
                   }}
                   required
-                />
-                <small className="form-help">Time window for checking metrics (whole hours only)</small>
+                >
+                  <option value="">Select an account...</option>
+                  {accounts
+                    .filter((acc) => acc.platform === formData.platform)
+                    .map((acc) => (
+                      <option key={acc.name} value={acc.name}>
+                        {acc.name}
+                      </option>
+                    ))}
+                </select>
+                <small className="form-help">Account name from {formData.platform === "taboola" ? "Taboola" : "Outbrain"}</small>
+              </div>
+
+              <div style={{ display: "flex", gap: "16px" }}>
+                <div className="form-group" style={{ flex: 1 }}>
+                  <label htmlFor="timeframe_hours">
+                    Timeframe (hours) <span className="required">*</span>
+                  </label>
+                  <input
+                    id="timeframe_hours"
+                    type="number"
+                    min="1"
+                    step="1"
+                    placeholder="e.g., 2"
+                    value={formData.timeframe_hours}
+                    onChange={(e) => {
+                      const value = e.target.value === "" ? "" : Math.round(Number(e.target.value));
+                      setFormData({ ...formData, timeframe_hours: value });
+                    }}
+                    required
+                  />
+                  <small className="form-help">Time window for checking metrics</small>
+                </div>
+
+                {formData.platform === "taboola" && formData.timezone && (
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label htmlFor="timezone">Timezone</label>
+                    <input
+                      id="timezone"
+                      type="text"
+                      value={formData.timezone}
+                      readOnly
+                      disabled
+                    />
+                    <small className="form-help">Auto-detected from account</small>
+                  </div>
+                )}
+
+                {formData.platform === "outbrain" && (
+                  <div className="form-group" style={{ flex: 1 }}>
+                    <label htmlFor="timezone">
+                      Timezone <span className="required">*</span>
+                    </label>
+                    <select
+                      id="timezone"
+                      value={formData.timezone ?? ""}
+                      onChange={(e) => setFormData({ ...formData, timezone: e.target.value || null })}
+                      required
+                    >
+                      <option value="">Select a timezone...</option>
+                      {TIMEZONE_OPTIONS.map((tz) => (
+                        <option key={tz.value} value={tz.value}>
+                          {tz.label}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="form-help">Required for check time and alerts</small>
+                  </div>
+                )}
               </div>
 
               <div className="form-group full-width">
@@ -701,6 +810,35 @@ export default function AlertsPage() {
                 </select>
                 <small className="form-help">
                   Determines which Slack channel receives alerts (SEV-1: critical, SEV-2: warning, SEV-3: info)
+                </small>
+              </div>
+
+              <div className="form-group">
+                <label>Check Time Range (optional)</label>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input
+                    id="check_time_start"
+                    type="text"
+                    placeholder="e.g., 09:00"
+                    pattern="^([01]\d|2[0-3]):[0-5]\d$"
+                    maxLength={5}
+                    value={formData.check_time_start ?? ""}
+                    onChange={(e) => setFormData({ ...formData, check_time_start: e.target.value || null })}
+                  />
+                  <span>to</span>
+                  <input
+                    id="check_time_end"
+                    type="text"
+                    placeholder="e.g., 17:00"
+                    pattern="^([01]\d|2[0-3]):[0-5]\d$"
+                    maxLength={5}
+                    value={formData.check_time_end ?? ""}
+                    onChange={(e) => setFormData({ ...formData, check_time_end: e.target.value || null })}
+                  />
+                </div>
+                <small className="form-help">
+                  Time range when this rule should be checked (leave empty to check on every cron run)
+                  {formData.timezone && ` - times are in ${formData.timezone}`}
                 </small>
               </div>
 
@@ -869,6 +1007,20 @@ export default function AlertsPage() {
                       {Number(rule.timeframe_hours)} hour{Number(rule.timeframe_hours) !== 1 ? "s" : ""}
                     </span>
                   </div>
+
+                  {rule.timezone && (
+                    <div className="rule-detail">
+                      <span className="detail-label">Timezone:</span>
+                      <span className="detail-value">{rule.timezone}</span>
+                    </div>
+                  )}
+
+                  {rule.check_time_start && rule.check_time_end && (
+                    <div className="rule-detail">
+                      <span className="detail-label">Check Time:</span>
+                      <span className="detail-value">{rule.check_time_start} - {rule.check_time_end}</span>
+                    </div>
+                  )}
 
                   <div className="rule-detail">
                     <span className="detail-label">Severity:</span>
