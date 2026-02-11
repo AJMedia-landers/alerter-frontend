@@ -132,6 +132,7 @@ export default function AlertsPage() {
   const [filterCondition, setFilterCondition] = useState<ConditionType | "all">("all");
   const [filterPlatform, setFilterPlatform] = useState<Platform | "all">("all");
   const [filterSeverity, setFilterSeverity] = useState<Severity | "all">("all");
+  const [bulkAction, setBulkAction] = useState<"disable" | "delete" | null>(null);
 
   // Account names for dropdown
   const [accounts, setAccounts] = useState<{ name: string; platform: string; timezone: string | null }[]>([]);
@@ -427,6 +428,60 @@ export default function AlertsPage() {
 
     setDebugResults(allResults);
     setDebugLoading(false);
+  };
+
+  const handleBulkDisable = async () => {
+    const ids = filteredRules.map((r) => r.id).filter(Boolean);
+    if (ids.length === 0) return;
+
+    try {
+      setError(null);
+      setSuccessMessage(null);
+      setBulkAction(null);
+
+      const response = await fetch("/api/alerter-rules/bulk/deactivate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await response.json();
+
+      if (data.count !== undefined) {
+        setSuccessMessage(`Successfully disabled ${data.count} rules`);
+        loadRules();
+      } else {
+        setError(data.message || "Failed to disable rules");
+      }
+    } catch {
+      setError("Failed to disable rules");
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ids = filteredRules.map((r) => r.id).filter(Boolean);
+    if (ids.length === 0) return;
+
+    try {
+      setError(null);
+      setSuccessMessage(null);
+      setBulkAction(null);
+
+      const response = await fetch("/api/alerter-rules/bulk/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids }),
+      });
+      const data = await response.json();
+
+      if (data.count !== undefined) {
+        setSuccessMessage(`Successfully deleted ${data.count} rules`);
+        loadRules();
+      } else {
+        setError(data.message || "Failed to delete rules");
+      }
+    } catch {
+      setError("Failed to delete rules");
+    }
   };
 
   const getAvailableConditions = (platform: Platform) => {
@@ -923,6 +978,22 @@ export default function AlertsPage() {
       <div className="rules-section">
         <div className="section-header">
           <h2>Active Rules ({filteredRules.length})</h2>
+          {filteredRules.length > 0 && (
+            <div className="bulk-actions">
+              <button
+                className="btn btn-sm btn-secondary"
+                onClick={() => setBulkAction("disable")}
+              >
+                Disable All Displayed
+              </button>
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={() => setBulkAction("delete")}
+              >
+                Delete All Displayed
+              </button>
+            </div>
+          )}
         </div>
 
         {filteredRules.length === 0 ? (
@@ -1058,6 +1129,42 @@ export default function AlertsPage() {
           </div>
         )}
       </div>
+
+      {bulkAction && (
+        <div className="modal-overlay" onClick={() => setBulkAction(null)}>
+          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+            <h2>
+              {bulkAction === "disable" ? "Disable All Displayed Rules" : "Delete All Displayed Rules"}
+            </h2>
+            <p className="modal-warning">
+              {bulkAction === "disable"
+                ? "This will deactivate all displayed rules. They will stop triggering alerts until re-enabled."
+                : "This will permanently delete all displayed rules. This action cannot be undone."}
+            </p>
+            <div className="modal-rules-list">
+              {filteredRules.map((rule) => (
+                <div key={rule.id} className="modal-rule-item">
+                  {rule.name}
+                </div>
+              ))}
+            </div>
+            <p className="modal-count">
+              This will affect <strong>{filteredRules.length}</strong> rule{filteredRules.length !== 1 ? "s" : ""}
+            </p>
+            <div className="modal-actions">
+              <button className="btn btn-sm btn-secondary" onClick={() => setBulkAction(null)}>
+                Cancel
+              </button>
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={bulkAction === "disable" ? handleBulkDisable : handleBulkDelete}
+              >
+                {bulkAction === "disable" ? "Disable All" : "Delete All"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
