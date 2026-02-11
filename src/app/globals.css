@@ -844,12 +844,20 @@ body {
 
 .section-header {
   margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
 .section-header h2 {
   font-size: 1.5rem;
   color: #2c3e50;
   margin: 0;
+}
+
+.bulk-actions {
+  display: flex;
+  gap: 0.5rem;
 }
 
 .empty-state {
@@ -1096,4 +1104,77 @@ body {
   .radio-group {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================
+   MODAL STYLES
+   ============================================ */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-card {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 520px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-card h2 {
+  margin: 0 0 1rem 0;
+  font-size: 1.25rem;
+  color: #2c3e50;
+}
+
+.modal-warning {
+  margin: 0 0 1rem 0;
+  font-size: 0.95rem;
+  color: #7f8c8d;
+  line-height: 1.5;
+}
+
+.modal-rules-list {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.modal-rule-item {
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  color: #2c3e50;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.modal-rule-item:last-child {
+  border-bottom: none;
+}
+
+.modal-count {
+  margin: 0 0 1.5rem 0;
+  font-size: 0.95rem;
+  color: #2c3e50;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
 }
