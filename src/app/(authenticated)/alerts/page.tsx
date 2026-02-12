@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import type { AlerterRule, RuleScope, ConditionType, Platform, Severity } from "@/types/alerter";
 
 // Debug/Cron types and constants
@@ -92,12 +92,9 @@ const TIMEZONE_OPTIONS = [
   { value: "UTC", label: "UTC" },
 ];
 
-// Generate time options at hour boundaries (XX:00 and XX:59)
-const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
-  const hours = String(Math.floor(i / 2)).padStart(2, "0");
-  const minutes = i % 2 === 0 ? "00" : "59";
-  return `${hours}:${minutes}`;
-});
+// Start times at top-of-hour (XX:00), end times at end-of-hour (XX:59)
+const START_TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:00`);
+const END_TIME_OPTIONS = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, "0")}:59`);
 
 const SEVERITY_OPTIONS: {
   value: Severity;
@@ -145,6 +142,7 @@ export default function AlertsPage() {
   const [accounts, setAccounts] = useState<{ name: string; platform: string; timezone: string | null }[]>([]);
   const [accountSearch, setAccountSearch] = useState("");
   const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+  const [highlightedIndex, setHighlightedIndex] = useState(-1);
   const accountDropdownRef = useRef<HTMLDivElement>(null);
 
   // Debug/Manual trigger state
@@ -172,6 +170,28 @@ export default function AlertsPage() {
     check_time_end: null,
     is_active: true,
   });
+
+  const filteredAccounts = useMemo(
+    () =>
+      accounts
+        .filter((acc) => acc.platform === formData.platform)
+        .filter((acc) => acc.name.toLowerCase().includes(accountSearch.toLowerCase())),
+    [accounts, formData.platform, accountSearch]
+  );
+
+  const selectAccount = useCallback(
+    (acc: { name: string; platform: string; timezone: string | null }) => {
+      const updates: Partial<typeof formData> = { account_name: acc.name };
+      if (formData.platform === "taboola" && acc.timezone) {
+        updates.timezone = acc.timezone;
+      }
+      setFormData((prev) => ({ ...prev, ...updates }));
+      setAccountSearch("");
+      setAccountDropdownOpen(false);
+      setHighlightedIndex(-1);
+    },
+    [formData.platform]
+  );
 
   const loadRules = useCallback(async () => {
     try {
@@ -234,6 +254,10 @@ export default function AlertsPage() {
     }
     if (!formData.account_name.trim()) {
       setError("Account name is required");
+      return;
+    }
+    if (!accounts.some((acc) => acc.name === formData.account_name && acc.platform === formData.platform)) {
+      setError("Please select a valid account from the dropdown");
       return;
     }
     if (formData.threshold === "" || formData.threshold <= 0) {
@@ -676,68 +700,83 @@ export default function AlertsPage() {
                   <input
                     id="account_name"
                     type="text"
+                    role="combobox"
+                    aria-expanded={accountDropdownOpen}
+                    aria-controls="account-listbox"
+                    aria-activedescendant={highlightedIndex >= 0 ? `account-option-${highlightedIndex}` : undefined}
                     style={{ width: "100%", boxSizing: "border-box" }}
                     placeholder="Search accounts..."
-                    value={accountDropdownOpen ? accountSearch : formData.account_name || accountSearch}
+                    value={accountDropdownOpen ? accountSearch : formData.account_name}
                     onChange={(e) => {
                       setAccountSearch(e.target.value);
                       setAccountDropdownOpen(true);
+                      setHighlightedIndex(-1);
                       if (!e.target.value) {
                         setFormData({ ...formData, account_name: "", timezone: formData.platform === "taboola" ? null : formData.timezone });
                       }
                     }}
                     onFocus={() => {
                       setAccountDropdownOpen(true);
-                      setAccountSearch("");
+                      setAccountSearch(formData.account_name);
+                    }}
+                    onKeyDown={(e) => {
+                      if (!accountDropdownOpen) return;
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setHighlightedIndex((prev) => Math.min(prev + 1, filteredAccounts.length - 1));
+                      } else if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setHighlightedIndex((prev) => Math.max(prev - 1, 0));
+                      } else if (e.key === "Enter") {
+                        e.preventDefault();
+                        if (highlightedIndex >= 0 && filteredAccounts[highlightedIndex]) {
+                          selectAccount(filteredAccounts[highlightedIndex]);
+                        }
+                      } else if (e.key === "Escape") {
+                        setAccountDropdownOpen(false);
+                        setHighlightedIndex(-1);
+                      }
                     }}
                     autoComplete="off"
                     required
                   />
                   {accountDropdownOpen && (
-                    <div style={{
-                      position: "absolute",
-                      top: "100%",
-                      left: 0,
-                      right: 0,
-                      maxHeight: "200px",
-                      overflowY: "auto",
-                      background: "#fff",
-                      border: "2px solid #e8e8e8",
-                      borderTop: "none",
-                      borderRadius: "0 0 6px 6px",
-                      zIndex: 10,
-                    }}>
-                      {accounts
-                        .filter((acc) => acc.platform === formData.platform)
-                        .filter((acc) => acc.name.toLowerCase().includes(accountSearch.toLowerCase()))
-                        .map((acc) => (
-                          <div
-                            key={acc.name}
-                            style={{
-                              padding: "0.6rem 0.75rem",
-                              cursor: "pointer",
-                              background: formData.account_name === acc.name ? "#ebf5fb" : "#fff",
-                              fontSize: "0.95rem",
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.background = "#f0f4f8")}
-                            onMouseLeave={(e) => (e.currentTarget.style.background = formData.account_name === acc.name ? "#ebf5fb" : "#fff")}
-                            onClick={() => {
-                              const updates: Partial<typeof formData> = { account_name: acc.name };
-                              if (formData.platform === "taboola" && acc.timezone) {
-                                updates.timezone = acc.timezone;
-                              }
-                              setFormData({ ...formData, ...updates });
-                              setAccountSearch("");
-                              setAccountDropdownOpen(false);
-                            }}
-                          >
-                            {acc.name}
-                          </div>
-                        ))}
-                      {accounts
-                        .filter((acc) => acc.platform === formData.platform)
-                        .filter((acc) => acc.name.toLowerCase().includes(accountSearch.toLowerCase()))
-                        .length === 0 && (
+                    <div
+                      id="account-listbox"
+                      role="listbox"
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        maxHeight: "200px",
+                        overflowY: "auto",
+                        background: "#fff",
+                        border: "2px solid #e8e8e8",
+                        borderTop: "none",
+                        borderRadius: "0 0 6px 6px",
+                        zIndex: 10,
+                      }}
+                    >
+                      {filteredAccounts.map((acc, idx) => (
+                        <div
+                          key={acc.name}
+                          id={`account-option-${idx}`}
+                          role="option"
+                          aria-selected={formData.account_name === acc.name}
+                          style={{
+                            padding: "0.6rem 0.75rem",
+                            cursor: "pointer",
+                            background: highlightedIndex === idx ? "#f0f4f8" : formData.account_name === acc.name ? "#ebf5fb" : "#fff",
+                            fontSize: "0.95rem",
+                          }}
+                          onMouseEnter={() => setHighlightedIndex(idx)}
+                          onClick={() => selectAccount(acc)}
+                        >
+                          {acc.name}
+                        </div>
+                      ))}
+                      {filteredAccounts.length === 0 && (
                         <div style={{ padding: "0.6rem 0.75rem", color: "#9ca3af", fontSize: "0.9rem" }}>
                           No matching accounts
                         </div>
@@ -958,7 +997,7 @@ export default function AlertsPage() {
                     onChange={(e) => setFormData({ ...formData, check_time_start: e.target.value || null })}
                   >
                     <option value="">Start time</option>
-                    {TIME_OPTIONS.map((t) => (
+                    {START_TIME_OPTIONS.map((t) => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
@@ -969,7 +1008,7 @@ export default function AlertsPage() {
                     onChange={(e) => setFormData({ ...formData, check_time_end: e.target.value || null })}
                   >
                     <option value="">End time</option>
-                    {TIME_OPTIONS.map((t) => (
+                    {END_TIME_OPTIONS.map((t) => (
                       <option key={t} value={t}>{t}</option>
                     ))}
                   </select>
