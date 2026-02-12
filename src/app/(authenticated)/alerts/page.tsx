@@ -92,6 +92,13 @@ const TIMEZONE_OPTIONS = [
   { value: "UTC", label: "UTC" },
 ];
 
+// Generate time options at hour boundaries (XX:00 and XX:59)
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const hours = String(Math.floor(i / 2)).padStart(2, "0");
+  const minutes = i % 2 === 0 ? "00" : "59";
+  return `${hours}:${minutes}`;
+});
+
 const SEVERITY_OPTIONS: {
   value: Severity;
   label: string;
@@ -134,8 +141,11 @@ export default function AlertsPage() {
   const [filterSeverity, setFilterSeverity] = useState<Severity | "all">("all");
   const [bulkAction, setBulkAction] = useState<"disable" | "delete" | null>(null);
 
-  // Account names for dropdown
+  // Account names for searchable dropdown
   const [accounts, setAccounts] = useState<{ name: string; platform: string; timezone: string | null }[]>([]);
+  const [accountSearch, setAccountSearch] = useState("");
+  const [accountDropdownOpen, setAccountDropdownOpen] = useState(false);
+  const accountDropdownRef = useRef<HTMLDivElement>(null);
 
   // Debug/Manual trigger state
   const [debugLoading, setDebugLoading] = useState(false);
@@ -202,6 +212,17 @@ export default function AlertsPage() {
     loadAccounts();
   }, []);
 
+  // Close account dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (accountDropdownRef.current && !accountDropdownRef.current.contains(e.target as Node)) {
+        setAccountDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -225,6 +246,14 @@ export default function AlertsPage() {
     }
     if (formData.platform === "outbrain" && !formData.timezone) {
       setError("Timezone is required for Outbrain rules");
+      return;
+    }
+    if ((formData.check_time_start && !formData.check_time_end) || (!formData.check_time_start && formData.check_time_end)) {
+      setError("Both start and end times must be set together");
+      return;
+    }
+    if (formData.check_time_start && formData.check_time_end && formData.check_time_start >= formData.check_time_end) {
+      setError("Check time start must be before end time");
       return;
     }
 
@@ -328,6 +357,8 @@ export default function AlertsPage() {
 
   const startEdit = (rule: AlerterRule) => {
     setEditingRule(rule);
+    setAccountSearch("");
+    setAccountDropdownOpen(false);
     setFormData({
       name: rule.name,
       platform: rule.platform ?? "taboola",
@@ -350,6 +381,8 @@ export default function AlertsPage() {
   };
 
   const resetForm = () => {
+    setAccountSearch("");
+    setAccountDropdownOpen(false);
     setFormData({
       name: "",
       platform: "taboola",
@@ -639,31 +672,79 @@ export default function AlertsPage() {
                 <label htmlFor="account_name">
                   Account Name <span className="required">*</span>
                 </label>
-                <select
-                  id="account_name"
-                  value={formData.account_name}
-                  onChange={(e) => {
-                    const selectedName = e.target.value;
-                    const selectedAccount = accounts.find(
-                      (acc) => acc.name === selectedName && acc.platform === formData.platform
-                    );
-                    const updates: Partial<typeof formData> = { account_name: selectedName };
-                    if (formData.platform === "taboola" && selectedAccount?.timezone) {
-                      updates.timezone = selectedAccount.timezone;
-                    }
-                    setFormData({ ...formData, ...updates });
-                  }}
-                  required
-                >
-                  <option value="">Select an account...</option>
-                  {accounts
-                    .filter((acc) => acc.platform === formData.platform)
-                    .map((acc) => (
-                      <option key={acc.name} value={acc.name}>
-                        {acc.name}
-                      </option>
-                    ))}
-                </select>
+                <div ref={accountDropdownRef} style={{ position: "relative" }}>
+                  <input
+                    id="account_name"
+                    type="text"
+                    style={{ width: "100%", boxSizing: "border-box" }}
+                    placeholder="Search accounts..."
+                    value={accountDropdownOpen ? accountSearch : formData.account_name || accountSearch}
+                    onChange={(e) => {
+                      setAccountSearch(e.target.value);
+                      setAccountDropdownOpen(true);
+                      if (!e.target.value) {
+                        setFormData({ ...formData, account_name: "", timezone: formData.platform === "taboola" ? null : formData.timezone });
+                      }
+                    }}
+                    onFocus={() => {
+                      setAccountDropdownOpen(true);
+                      setAccountSearch("");
+                    }}
+                    autoComplete="off"
+                    required
+                  />
+                  {accountDropdownOpen && (
+                    <div style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      maxHeight: "200px",
+                      overflowY: "auto",
+                      background: "#fff",
+                      border: "2px solid #e8e8e8",
+                      borderTop: "none",
+                      borderRadius: "0 0 6px 6px",
+                      zIndex: 10,
+                    }}>
+                      {accounts
+                        .filter((acc) => acc.platform === formData.platform)
+                        .filter((acc) => acc.name.toLowerCase().includes(accountSearch.toLowerCase()))
+                        .map((acc) => (
+                          <div
+                            key={acc.name}
+                            style={{
+                              padding: "0.6rem 0.75rem",
+                              cursor: "pointer",
+                              background: formData.account_name === acc.name ? "#ebf5fb" : "#fff",
+                              fontSize: "0.95rem",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = "#f0f4f8")}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = formData.account_name === acc.name ? "#ebf5fb" : "#fff")}
+                            onClick={() => {
+                              const updates: Partial<typeof formData> = { account_name: acc.name };
+                              if (formData.platform === "taboola" && acc.timezone) {
+                                updates.timezone = acc.timezone;
+                              }
+                              setFormData({ ...formData, ...updates });
+                              setAccountSearch("");
+                              setAccountDropdownOpen(false);
+                            }}
+                          >
+                            {acc.name}
+                          </div>
+                        ))}
+                      {accounts
+                        .filter((acc) => acc.platform === formData.platform)
+                        .filter((acc) => acc.name.toLowerCase().includes(accountSearch.toLowerCase()))
+                        .length === 0 && (
+                        <div style={{ padding: "0.6rem 0.75rem", color: "#9ca3af", fontSize: "0.9rem" }}>
+                          No matching accounts
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
                 <small className="form-help">Account name from {formData.platform === "taboola" ? "Taboola" : "Outbrain"}</small>
               </div>
 
@@ -871,25 +952,27 @@ export default function AlertsPage() {
               <div className="form-group">
                 <label>Check Time Range (optional)</label>
                 <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                  <input
+                  <select
                     id="check_time_start"
-                    type="text"
-                    placeholder="e.g., 09:00"
-                    pattern="^([01]\d|2[0-3]):[0-5]\d$"
-                    maxLength={5}
                     value={formData.check_time_start ?? ""}
                     onChange={(e) => setFormData({ ...formData, check_time_start: e.target.value || null })}
-                  />
+                  >
+                    <option value="">Start time</option>
+                    {TIME_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                   <span>to</span>
-                  <input
+                  <select
                     id="check_time_end"
-                    type="text"
-                    placeholder="e.g., 17:00"
-                    pattern="^([01]\d|2[0-3]):[0-5]\d$"
-                    maxLength={5}
                     value={formData.check_time_end ?? ""}
                     onChange={(e) => setFormData({ ...formData, check_time_end: e.target.value || null })}
-                  />
+                  >
+                    <option value="">End time</option>
+                    {TIME_OPTIONS.map((t) => (
+                      <option key={t} value={t}>{t}</option>
+                    ))}
+                  </select>
                 </div>
                 <small className="form-help">
                   Time range when this rule should be checked (leave empty to check on every cron run)
