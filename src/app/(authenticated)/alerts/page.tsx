@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import type { AlerterRule, RuleScope, ConditionType, Platform, Severity } from "@/types/alerter";
 
 // Debug/Cron types and constants
@@ -123,6 +124,7 @@ const SEVERITY_OPTIONS: {
 ];
 
 export default function AlertsPage() {
+  const router = useRouter();
   const formRef = useRef<HTMLDivElement>(null);
   const [rules, setRules] = useState<AlerterRule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -193,25 +195,38 @@ export default function AlertsPage() {
     [formData.platform]
   );
 
+  const handleSessionExpired = useCallback(() => {
+    fetch("/api/auth/logout", { method: "POST" }).finally(() => {
+      router.push("/login");
+      router.refresh();
+    });
+  }, [router]);
+
   const loadRules = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const url = showInactive ? "/api/alerter-rules" : "/api/alerter-rules?active=true";
       const response = await fetch(url);
+
+      if (response.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+
       const data = await response.json();
 
       if (data.data) {
         setRules(data.data);
       } else {
-        setError("Failed to load rules");
+        setError("Failed to load rules. Please try refreshing the page.");
       }
     } catch {
-      setError("Failed to load rules");
+      setError("Could not connect to server — check your connection and try again.");
     } finally {
       setLoading(false);
     }
-  }, [showInactive]);
+  }, [showInactive, handleSessionExpired]);
 
   useEffect(() => {
     loadRules();
@@ -221,6 +236,10 @@ export default function AlertsPage() {
     const loadAccounts = async () => {
       try {
         const response = await fetch("/api/accounts");
+        if (response.status === 401) {
+          handleSessionExpired();
+          return;
+        }
         const data = await response.json();
         if (data.data) {
           setAccounts(data.data);
@@ -307,6 +326,11 @@ export default function AlertsPage() {
         });
       }
 
+      if (response.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+
       const data = await response.json();
 
       if (data.data || data.rule_id) {
@@ -320,10 +344,10 @@ export default function AlertsPage() {
         resetForm();
         loadRules();
       } else {
-        setError(data.message || "Failed to save rule");
+        setError(data.message || "Failed to save rule. Please try again.");
       }
     } catch {
-      setError("Failed to save rule");
+      setError("Could not connect to server — check your connection and try again.");
     }
   };
 
@@ -339,16 +363,22 @@ export default function AlertsPage() {
       const response = await fetch(`/api/alerter-rules/${rule.id}`, {
         method: "DELETE",
       });
+
+      if (response.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+
       const data = await response.json();
 
       if (data.message) {
         setSuccessMessage(`Successfully deleted rule "${rule.name}"`);
         loadRules();
       } else {
-        setError("Failed to delete rule");
+        setError("Failed to delete rule. Please try again.");
       }
     } catch {
-      setError("Failed to delete rule");
+      setError("Could not connect to server — check your connection and try again.");
     }
   };
 
@@ -364,6 +394,12 @@ export default function AlertsPage() {
         : `/api/alerter-rules/${rule.id}/activate`;
 
       const response = await fetch(endpoint, { method: "POST" });
+
+      if (response.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+
       const data = await response.json();
 
       if (data.message) {
@@ -372,10 +408,10 @@ export default function AlertsPage() {
         );
         loadRules();
       } else {
-        setError(`Failed to ${rule.is_active ? "deactivate" : "activate"} rule`);
+        setError(`Failed to ${rule.is_active ? "deactivate" : "activate"} rule. Please try again.`);
       }
     } catch {
-      setError("Failed to toggle rule status");
+      setError("Could not connect to server — check your connection and try again.");
     }
   };
 
@@ -501,16 +537,22 @@ export default function AlertsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
       });
+
+      if (response.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+
       const data = await response.json();
 
       if (data.count !== undefined) {
         setSuccessMessage(`Successfully disabled ${data.count} rules`);
         loadRules();
       } else {
-        setError(data.message || "Failed to disable rules");
+        setError(data.message || "Failed to disable rules. Please try again.");
       }
     } catch {
-      setError("Failed to disable rules");
+      setError("Could not connect to server — check your connection and try again.");
     }
   };
 
@@ -528,16 +570,22 @@ export default function AlertsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ids }),
       });
+
+      if (response.status === 401) {
+        handleSessionExpired();
+        return;
+      }
+
       const data = await response.json();
 
       if (data.count !== undefined) {
         setSuccessMessage(`Successfully deleted ${data.count} rules`);
         loadRules();
       } else {
-        setError(data.message || "Failed to delete rules");
+        setError(data.message || "Failed to delete rules. Please try again.");
       }
     } catch {
-      setError("Failed to delete rules");
+      setError("Could not connect to server — check your connection and try again.");
     }
   };
 
